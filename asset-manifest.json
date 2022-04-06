@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/Conway/static/css/main.fed5b0ea.css",
+    "main.js": "/Conway/static/js/main.d827729d.js",
+    "index.html": "/Conway/index.html",
+    "main.fed5b0ea.css.map": "/Conway/static/css/main.fed5b0ea.css.map",
+    "main.d827729d.js.map": "/Conway/static/js/main.d827729d.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.fed5b0ea.css",
+    "static/js/main.d827729d.js"
+  ]
+}
