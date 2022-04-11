@@ -9,50 +9,116 @@ export class Selection {
     }
 }
 
+export class Area {
+    constructor(row = 0, col = 0, width = 0, height = 0) {
+        this.row = row;
+        this.col = col;
+        this.width = width;
+        this.height = height
+    }
+    
+    get rightSide() {
+        return this.col + this.width
+    }
+
+    get bottomSide() {
+        return this.row + this.height
+    }
+
+    get area() {
+        return this.width * this.height
+    }
+
+    get info() {
+        return [this.row, this.col, this.width, this.height]
+    }
+
+    containsArea({row, col, width = 1, height = 1}) {
+        return ((this.row <= row && this.row + this.height > row) || (row <= this.row && row + height > this.row)) && ((this.col <= col && this.col + this.width > col) || (col <= this.col && col + width > this.col))
+    }
+}
+
+export class KeyBinding {
+    constructor({key = ' ', callback = () => console.log('key pressed'), onShift = false, onControl = false, onAlt = false}) {
+        this.callback = callback;
+        this.key = key;
+        this.onShift = onShift;
+        this.onControl = onControl;
+        this.onAlt = onAlt;
+    }
+
+    test(event) {
+        return event.key == this.key && this.onShift == event.shiftKey && this.onControl == event.ctrlKey && this.onAlt == event.altKey
+    }
+
+    testAndRun(event) {
+        if (this.test(event)) {
+            this.run(event)
+        }
+    }
+
+    run(event) {
+        this.callback(event)
+    }
+}
+
+
 export const App = () => {
     const canvasRef = useRef()
     const [animating, setAnimating] = useState(false)
     const [selections, setSelections] = useState([])
+    const [currentGeneration, setCurrentGeneration] = useState(0)
+    const [pattern, setPattern] = useState([{row: 0, col: 0}])
+    const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 5, 2))
+    const [view, setView] = useState({
+        coordinates: { //x is cols, y is rows
+            row: 0,
+            col: 0
+        },
+        zoom: 1
+    })
+
     const [settings, setSettings] = useState({
-      size: {
-        rows: 10,
-        cols: 10
-      },
       tickSpeed: 5,
       randomizeAmount: 10,
+      autoExpand: false
     })
+
+
+    const resizeCanvas = () => {
+        if (!canvasRef.current) return
+        canvasRef.current.width = getCanvasBounds().width;
+        canvasRef.current.height = getCanvasBounds().height
+    }
+
     const isAnimating = useRef(animating)
     const animationStartTime = useRef(Date.now())
+    const movingSelectedArea = useRef(false)
     const selectionsBeforeAnimation = useRef(selections);
-    const cloneSelections = (selectionList) => selectionList.map(({row, col}) => new Selection(row, col))
-    useEffect(() => { 
-      isAnimating.current = animating;
-      animationStartTime.current = Date.now() 
-      
-      if (animating) {
-        selectionsBeforeAnimation.current = cloneSelections(selections)
-      } else {
-        setSelections(selectionsBeforeAnimation.current)
-      }
-    }, [animating])
-
+    const lastGeneration = useRef([])
     const lastTick = useRef(Date.now())
     const isDragging = useRef(false)
     const dragMode = useRef('erasing')
     const getMillisecondsPerTick = () => 1000 / settings.tickSpeed
-    const getMillisecondsSinceLastTick = () => Date.now() - lastTick.current
-    const isInBounds = ({row, col}) => row >= 0 && col >= 0 && row < settings.size.rows && col < settings.size.cols
     const getContext = () => canvasRef.current.getContext("2d")
     const getCanvasBounds = () => canvasRef.current.getBoundingClientRect()
-    const getCellSize = () => {
-        return {
-            width: getCanvasBounds().width / settings.size.cols,
-            height: getCanvasBounds().height / settings.size.rows
-        }
+    const getCellSize = () => Math.min(getCanvasBounds().width, getCanvasBounds().height) / (10 / Math.max(0.05, view.zoom))
+    const getAspectRatio = () => canvasRef.current ? canvasRef.current.width / canvasRef.current.height : (16 / 9)
+
+    const getViewRange = () => {
+        const {row: rowStart, col: colStart} = view.coordinates
+        const rowEnd = rowStart + getCanvasBounds().height / getCellSize()
+        const colEnd = colStart + getCanvasBounds().width / getCellSize()
+        return [Math.floor(rowStart), Math.floor(rowEnd), Math.floor(colStart), Math.floor(colEnd)]
     }
-    const getY = (row) => row * getCellSize().height
-    const getX = (col) => col * getCellSize().width
+
+    const isInView = (selection) => {
+        const [rowStart, rowEnd, colStart, colEnd] = getViewRange()
+        return selection.row >= rowStart && selection.row < rowEnd && selection.col >= colStart && selection.col < colEnd
+    }
+
     const isSelected = ({row, col}) => selections.some(sel => sel.row === row && sel.col === col)
+    const isEmpty = () => selections.length == 0
     const isEqualSelection = (first, second) => first.row === second.row && first.col === second.col
     const removeDuplicates = (selectionList) => {
         const tracker = []
@@ -66,56 +132,193 @@ export const App = () => {
         })
     }
 
-    const removeOutOfBounds = (selectionList) => {
-        return selectionList.filter(sel => isInBounds(sel))
-    }
+    const cloneSelections = (selectionList) => selectionList.map(({row, col}) => new Selection(row, col))
 
-    const getClickedSelection = (event) => {
-        const {width: cellWidth, height: cellHeight} = getCellSize()
-        const bounds = getCanvasBounds();
+    function clear() {
+        selectionsBeforeAnimation.current = []
+        setSelections([])
+        lastGeneration.current = []
+        setCurrentGeneration(0)
+      }
 
-        const col = Math.floor((event.clientX - bounds.x) / cellWidth);
-        const row = Math.floor((event.clientY - bounds.y) / cellHeight);
-        return new Selection(row, col)
-    }
-
-
-    const select = (selection) => {
-        console.log(selection)
-        if (isSelected(selection)) {
-            console.log('selected')
-            setSelections(selections.filter(sel => !isEqualSelection(selection, sel)))
-        } else {
-            setSelections(selections.concat(selection))
+    const isStable = () => selections.every(lastCell => lastGeneration.current.some(cell => isEqualSelection(cell, lastCell))) && lastGeneration.current.length == selections.length
+    const getMousePositionInCanvas = (mouseEvent) => {
+        if (!canvasRef.current) return {x: 0, y: 0}
+        const bounds = getCanvasBounds()
+        return {
+            x: mouseEvent.clientX - bounds.left,
+            y: mouseEvent.clientY - bounds.top
         }
     }
 
-    function draw() {
-        if (!canvasRef.current) return
-        const context = getContext()
-        canvasRef.current.style.backgroundColor = animating ? 'black' : ""
-        context.fillStyle = 'white'
-        context.strokeStyle = 'black'
-        context.lineWidth = 1;
-        const {width: cellWidth, height: cellHeight} = getCellSize()
-        const {rows, cols} = settings.size;
-
-
-
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                if (isSelected(new Selection(row, col))) {
-                    context.fillRect(getX(col), getY(row), cellWidth, cellHeight)
-                }
-                context.strokeRect(getX(col), getY(row), cellWidth, cellHeight)
+    const getHoveredCell = (event) => {
+        const bounds = getCanvasBounds();
+        const col = Math.floor((event.clientX - bounds.x + (view.coordinates.col * getCellSize())) / getCellSize());
+        const row = Math.floor((event.clientY - bounds.y + (view.coordinates.row * getCellSize())) / getCellSize());
+        return new Selection(row, col)
+    }
+   
+    const DragBrush = (event) => {
+        if (!isDragging.current || event.shiftKey || event.ctrlKey || event.altKey || animating || movingSelectedArea.current) return
+        const cell = getHoveredCell(event);
+        if (dragMode.current == 'erasing') {
+            setSelections(selections.filter(sel => !isEqualSelection(cell, sel)))
+        } else if (dragMode.current == 'drawing') {
+            if (!isSelected(cell)) {
+                setSelections(selections.concat(cell))
             }
         }
     }
 
+    const lastMousePosition = useRef({x: 0, y: 0})
+    const mousePan = (event) => {
+        if (!event.shiftKey || event.ctrlKey || !isDragging.current) return
+        const {x: lastX, y: lastY} = lastMousePosition.current
+        if (lastX == 0 && lastY == 0) {
+            lastMousePosition.current = getMousePositionInCanvas(event)
+            return
+        }
+
+        const {x: currentX, y: currentY} = getMousePositionInCanvas(event)
+        const colOffset = (currentX - lastX) / getCellSize();
+        const rowOffset = (currentY - lastY) / getCellSize();
+        console.log('rowOffset: ', rowOffset, 'colOffset: ', colOffset)
+        console.log(view.coordinates)
+        setView({...view, coordinates: { row: view.coordinates.row + rowOffset, col: view.coordinates.col + colOffset}})
+        lastMousePosition.current = getMousePositionInCanvas(event)
+    }
+
+    const mouseZoom = event => {
+        if (!event.ctrlKey || event.shiftKey || !isDragging.current) return
+        const {x: lastX, y: lastY} = lastMousePosition.current
+        if (lastX == 0 && lastY == 0) {
+            lastMousePosition.current = getMousePositionInCanvas(event)
+            return
+        }
+
+        const {y: currentY} = getMousePositionInCanvas(event)
+        const zoomOffset = (currentY - lastY) / 100;
+        setView({...view, zoom: view.zoom + zoomOffset})
+        lastMousePosition.current = getMousePositionInCanvas(event)
+    }
+
+    
+    const select = (centerSelection) => {
+        if (isSelected(centerSelection)) {
+            console.log('selected')
+            setSelections(selections.filter(sel => 
+            !pattern.some(patternCell => 
+            isEqualSelection(new Selection(patternCell.row + centerSelection.row, patternCell.col + centerSelection.col), sel))))
+        } else {
+            setSelections(selections.concat(...pattern.map(sel => new Selection(sel.row + centerSelection.row, sel.col + centerSelection.col))))
+        }
+    }
+
+    const clickedSelectedArea = event => selectedArea.containsArea(getHoveredCell(event))
+    const selectedAreaAnchor = useRef(new Selection(0, 0))
+
+    const startAreaSelection = (event) => {
+        if (!event.altKey || event.shiftKey || event.ctrlKey) return
+        const hoveredCell = getHoveredCell(event)
+        selectedAreaAnchor.current = hoveredCell;
+        setSelectedArea(new Area(hoveredCell.row, hoveredCell.col, 1, 1))
+    }
+
+    const selectingArea = (event) => {
+        if (!event.altKey || event.shiftKey || event.ctrlKey || !isDragging.current) return
+
+        const hoveredCell = getHoveredCell(event)
+        const anchor = selectedAreaAnchor.current
+        setSelectedArea(new Area(
+            Math.min(hoveredCell.row, anchor.row),
+            Math.min(hoveredCell.col, anchor.col), 
+            Math.abs(hoveredCell.col - anchor.col),
+            Math.abs(hoveredCell.row - anchor.row)
+        ))
+    }
+
+    const moveSelectedArea = event => {
+        if (event.ctrlKey || event.shiftKey || !movingSelectedArea.current) return
+        const {x: lastX, y: lastY} = lastMousePosition.current
+        if (lastX == 0 && lastY == 0) {
+            lastMousePosition.current = getMousePositionInCanvas(event)
+            return
+        }
+
+        const {x: currentX, y: currentY} = getMousePositionInCanvas(event)
+        const colOffset = (currentX - lastX) / getCellSize();
+        const rowOffset = (currentY - lastY) / getCellSize();
+        const newLocation = new Area(selectedArea.row + rowOffset, selectedArea.col + colOffset, selectedArea.width, selectedArea.height)
+        setSelectedArea(newLocation)
+        setSelections(selections.map(sel => newLocation.containsArea(sel) ? new Selection(sel.row + newLocation.row - selectedArea.row, sel.col + newLocation.col - selectedArea.col) : new Selection(sel.row, sel.col)))
+        lastMousePosition.current = getMousePositionInCanvas(event)
+    }
+
+    const getBackgroundColor = () => {
+        if (animating) {
+             if (isStable() && !isEmpty() && currentGeneration > 1) {
+                return 'darkred'
+            }
+            return 'black'
+        }
+        return ''
+    }
+
+    function draw() {
+        const canvas = canvasRef.current
+        if (!canvasRef) return
+        const context = getContext()
+        canvas.style.backgroundColor = getBackgroundColor()
+        context.fillStyle = 'white'
+        context.strokeStyle = 'black'
+        context.lineWidth = 1;
+        const [rowStart, rowEnd, colStart, colEnd] = getViewRange()
+        const cellSize = getCellSize()
+        const currentBox = (row, col, width = 1, height = 1) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize * width, cellSize * height]
+
+
+        selections.forEach(selection => context.fillRect(...currentBox(selection.row, selection.col)) )
+
+        context.beginPath()
+        if (!animating) {
+            for (let row = rowStart - 1; row < rowEnd + 1; row++) {
+                context.moveTo(0, (row - view.coordinates.row) * cellSize);
+                context.lineTo(canvas.width,  (row - view.coordinates.row) * cellSize)
+            }
+
+            for (let col = colStart - 1; col < colEnd + 1; col++) {
+                context.moveTo((col - view.coordinates.col) * cellSize, 0)
+                context.lineTo((col - view.coordinates.col) * cellSize, canvas.height)
+            }   
+            context.stroke();
+        }
+
+        context.globalAlpha = selectedArea.containsArea(lastMousePosition.current) ? 0.5 : 0.25
+        context.fillRect(...currentBox(...selectedArea.info))
+        context.globalAlpha = 1;
+    }
+
+    const lastHoveredCell = useRef(new Selection(0, 0))
+    const drawMouseShadow = (event) => {
+        const hoveredCell = getHoveredCell(event)
+        if (animating || isEqualSelection(lastHoveredCell.current, hoveredCell)) return
+        lastHoveredCell.current = hoveredCell
+        const context = getContext()
+        context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        draw()
+        context.fillStyle = 'white'
+        const cellSize = getCellSize()
+        const currentBox = (row, col) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize, cellSize]
+        context.globalAlpha = 0.5
+        
+        pattern.forEach(cell => {
+            context.fillRect(...currentBox(cell.row + hoveredCell.row, cell.col + hoveredCell.col))
+        })
+
+        context.globalAlpha = 1;
+    }
+
 //  If the cell is alive, then it stays alive if it has either 2 or 3 live neighbors
-
-// If the cell is dead, then it springs to life only in the case that it has 3 live neighbors
-
 
     function getNeighbors(selection) {
         const neighbors = []
@@ -127,8 +330,6 @@ export const App = () => {
                 }
             }
         }
-        // console.log('selections', selections.length)
-        // console.log(selections)
         return neighbors
     }
 
@@ -137,7 +338,7 @@ export const App = () => {
     }
 
     function getAreasToCheck() {
-        return removeOutOfBounds(removeDuplicates(selections.flatMap(sel => [...getNeighbors(sel), sel])))
+        return removeDuplicates(selections.flatMap(sel => [...getNeighbors(sel), sel]))
     }
 
     function tick() {
@@ -150,63 +351,123 @@ export const App = () => {
             return numOfLiveNeighbors === 3
         }
 
-        console.log('filtered', testCells.filter(nextGenFilter).length)
+        const living = testCells.filter(nextGenFilter)
+
+        console.log('filtered', living.length)
         console.log('unfiltered', testCells.length)
-        setSelections(testCells.filter(nextGenFilter))
+        setSelections(living)
+        setCurrentGeneration(currentGeneration + 1)
         lastTick.current = Date.now()
+        lastGeneration.current = cloneSelections(selections)
         console.log('updating');
     }
 
-    const resizeCanvas = () => {
-        if (!canvasRef.current) return
-        canvasRef.current.width = getCanvasBounds().width;
-        canvasRef.current.height = getCanvasBounds().height
-    }
 
+    const observer = useRef(new ResizeObserver(() => {resizeCanvas(); draw()}));
+    useEffect(() => {resizeCanvas(); draw()}, [])
     useEffect(() => {
-        function update() { resizeCanvas(); draw(); };
-        update()
-        const observer = new ResizeObserver(() => update());
-        observer.observe(canvasRef.current)
+        observer.current.disconnect()
+        observer.current = new ResizeObserver(() => {resizeCanvas(); draw()})
+        observer.current.observe(canvasRef.current)
     })
 
     
+    const frameRequested = useRef(false);
+    useEffect(() => { 
+        isAnimating.current = animating;
+        animationStartTime.current = Date.now() 
+        
+        if (animating) {
+            setSelections(removeDuplicates(selections))
+            selectionsBeforeAnimation.current = cloneSelections(selections)
+        } else {
+            setSelections(selectionsBeforeAnimation.current)
+            setCurrentGeneration(0)
+            lastGeneration.current = []
+            frameRequested.current = false;
+        }
+      }, [animating])
+
 
     useEffect(() => {
         function getNextTick() {
             if (isAnimating.current) {
                 if (Date.now() - lastTick.current > getMillisecondsPerTick()) {
                     tick()
+                    frameRequested.current = false;
                 } else {
                     setTimeout(() => getNextTick(), getMillisecondsPerTick() - (Date.now() - lastTick.current))
                 }
             }
         }
-        getNextTick()
+        
+        if (!frameRequested.current && isAnimating.current) {
+            console.log(frameRequested.current)
+            frameRequested.current = true;
+            getNextTick()
+        }
     })
 
-    const keyEvents = {
-        Enter: () => setAnimating(!animating)
-    }
+    const keyEvents = [
+        new KeyBinding({key: "Enter", callback: () => setAnimating(!animating)}),
+        new KeyBinding({key: "Delete", callback: () => clear()}),
+        new KeyBinding({key: "-", callback: () => setView({...view, zoom: view.zoom - 0.05 })}),
+        new KeyBinding({key: "=", callback: () => setView({...view, zoom: view.zoom + 0.05 })}),
+        new KeyBinding({key: "w", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row - 1}})}),
+        new KeyBinding({key: "a", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col - 1}})}),
+        new KeyBinding({key: "s", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row + 1}})}),
+        new KeyBinding({key: "d", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col + 1}})}),
+        new KeyBinding({key: "UpArrow", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row - 1}})}),
+        new KeyBinding({key: "LeftArrow", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col - 1}})}),
+        new KeyBinding({key: "DownArrow", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row + 1}})}),
+        new KeyBinding({key: "RightArrow", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col + 1}})})
+    ]
 
     function keyListener(keyEvent) {
         console.log(keyEvent.key)
-        if (Object.keys(keyEvents).some(key => key === keyEvent.key)) {
-            keyEvents[keyEvent.key]()
+        keyEvents.forEach(binding => binding.testAndRun(keyEvent))
+    }
+
+    function mouseDownListener(mouseEvent) {
+        isDragging.current = true;
+        startAreaSelection(mouseEvent)
+        if (mouseEvent.shiftKey || mouseEvent.altKey || mouseEvent.ctrlKey) return
+
+        if (clickedSelectedArea(mouseEvent)) {
+            movingSelectedArea.current = true;
+            moveSelectedArea(mouseEvent); return;
         }
+
+        if (!animating) {
+            isSelected(getHoveredCell(mouseEvent)) ? dragMode.current = 'erasing' : dragMode.current = 'drawing'
+            select(getHoveredCell(mouseEvent))
+        }
+    }
+
+    function mouseMoveListener(mouseEvent) {
+        DragBrush(mouseEvent); 
+        mousePan(mouseEvent); 
+        mouseZoom(mouseEvent); 
+        drawMouseShadow(mouseEvent); 
+        selectingArea(mouseEvent);
+        moveSelectedArea(mouseEvent)
+    }
+
+    const onMouseUp = (event) => {
+        lastMousePosition.current = {x: 0, y: 0}
+        isDragging.current = false
+        movingSelectedArea.current = false;
+        setSelectedArea(new Area(Math.round(selectedArea.row), Math.round(selectedArea.col), Math.round(selectedArea.width), Math.round(selectedArea.height)))
+        setSelections(selections.map(sel => new Selection(Math.round(sel.row), Math.round(sel.col))))
     }
 
     function randomizeSelections() {
       const randomized = []
+      const [rowStart, rowEnd, colStart, colEnd] = getViewRange()
       for (let i = 0; i < settings.randomizeAmount; i++) {
-        randomized.push(new Selection(Math.round(Math.random() * settings.size.rows), Math.round(Math.random() * settings.size.cols)))
+        randomized.push(new Selection(rowStart + Math.round(Math.random() * rowEnd), colStart + Math.round(Math.random() * colEnd)))
       }
       setSelections(randomized);
-    }
-
-    function clear() {
-      selectionsBeforeAnimation.current = []
-      setSelections([])
     }
 
 
@@ -216,11 +477,29 @@ export const App = () => {
 
   return (
       <>
-        <canvas className='game-canvas' ref={canvasRef} onMouseDown={(event) => {
-        isDragging.current = true;
-        select(getClickedSelection(event))
-    }
-    } onMouseUp={() => isDragging.current = false} onMouseMove={(event) => isDragging.current ? getClickedSelection(event) : ''}onKeyDown={keyListener} tabIndex={0} />
+
+      <div className='game-area'> 
+        <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onMouseUp} onMouseLeave={onMouseUp} onMouseMove={mouseMoveListener} onKeyDown={keyListener} tabIndex={0} />
+        { animating && <div className='animating-ui'>
+                <h3 className='generation-display'> Current Generation: { currentGeneration } </h3>
+                <div className='flex-column'>
+                    <label htmlFor="speed-slider"> FPS: { settings.tickSpeed } </label>
+                    <input id="speed-slider" type='range' min='1' max='100' value={settings.tickSpeed} onChange={(event) => setSettings({...settings, tickSpeed: Number(event.target.value) }) } />
+                </div>
+             </div>}
+
+        <div className='game-display-information flex-column'>
+            <div className='coordinate-display flex-column' >
+                View <br/>
+                Row: <span> {Math.round(view.coordinates.row * 100) / 100} </span> <br/>
+                Col: <span> {Math.round(view.coordinates.col * 100) / 100} </span> <br/>
+            </div>
+
+            <label htmlFor='zoom-input'> Zoom: {Math.round(view.zoom * 100) / 100} </label>
+            <input type="range" id='zoom-input' min="0.05" max='3' step="0.05" value={view.zoom} onChange={(event) => setView({...view, zoom: Number(event.target.value)}) }/>
+        </div>
+
+      </div>
 
         <Sidebar>
             <div> Conway's Game Of Life </div>
@@ -235,17 +514,11 @@ export const App = () => {
 
             <button className={`settings-button ${settingsMenu ? 'opened' : ''}`} onClick={() => setSettingsMenu(!settingsMenu)}> Settings </button>
             { settingsMenu && <div className='settings'>
-                <div className='settings-size'>
-                  <label htmlFor="row-input"> Rows: </label>
-                  <input id="row-input" type='number' value={settings.size.rows} onChange={(event) => setSettings({...settings, size: { ...settings.size, rows: event.target.value}})} />
-                  <label htmlFor="col-input"> Cols: </label>
-                  <input id="col-input" type='number' value={settings.size.cols} onChange={(event) => setSettings({...settings, size: { ...settings.size, cols: event.target.value}})} />
-                </div>
 
                 <label htmlFor="randomize-amount-input"> Amount to Randomize: </label>
-                <input id="randomize-amount-input" type='number' value={settings.randomizeAmount} onChange={(event) => setSettings({...settings, randomizeAmount: event.target.value })} />
+                <input id="randomize-amount-input" type='number' value={settings.randomizeAmount} onChange={(event) => setSettings({...settings, randomizeAmount: Number(event.target.value) })} />
                 <label htmlFor="tick-speed-input"> Frames Per Second: </label>
-                <input id="tick-speed-input" type='number' value={settings.tickSpeed} onChange={(event) => setSettings({...settings, tickSpeed: event.target.value })} />
+                <input id="tick-speed-input" type='number' value={settings.tickSpeed} onChange={(event) => setSettings({...settings, tickSpeed: Number(event.target.value) })} />
               </div>}
 
             <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
