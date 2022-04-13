@@ -1,3 +1,4 @@
+
 export class Selection {
     constructor(row, col) {
         this.row = row
@@ -31,30 +32,51 @@ export class Selection {
     }
   
     containsArea({row, col, width = 1, height = 1}) {
+        if (this.width == 0 || this.height == 0) return false
+        
         return ((this.row <= row && this.row + this.height > row) || (row <= this.row && row + height > this.row)) && ((this.col <= col && this.col + this.width > col) || (col <= this.col && col + width > this.col))
     }
   }
   
   export class KeyBinding {
-    constructor({key = ' ', callback = () => console.log('key pressed'), onShift = false, onControl = false, onAlt = false}) {
-        this.callback = callback;
+    constructor({key = 'any', onDown = () => console.log('key pressed'), onUp = () => console.log('key lifted'), onShift = false, onControl = false, onAlt = false}) {
+        this.onDown = onDown;
+        this.onUp = onUp
         this.key = key;
-        this.onShift = onShift;
-        this.onControl = onControl;
-        this.onAlt = onAlt;
+        this.onShift = key === 'Shift' ? true : onShift;
+        this.onControl = key === 'Control' ? true : onControl;
+        this.onAlt = key === 'Alt' ? true : onAlt;
     }
   
-    test(event) {
-        return event.key == this.key && this.onShift == event.shiftKey && this.onControl == event.ctrlKey && this.onAlt == event.altKey
+    testDown(event) {
+        return event.type == 'keydown' && (event.key == this.key || this.key == 'any') && this.onShift == event.shiftKey && this.onControl == event.ctrlKey && this.onAlt == event.altKey
     }
-  
-    testAndRun(event) {
-        if (this.test(event)) {
-            this.run(event)
+
+    runDown(event) {
+        this.onDown(event)
+    }
+
+    testAndRunDown(event) {
+        if (this.testDown(event)) {
+            this.runDown(event)
         }
     }
+
+    testUp(event) {
+        return event.type == 'keyup' && (event.key == this.key || this.key == 'any') 
+         && (this.onShift ? this.onShift != event.shiftKey : this.onShift == event.shiftKey)
+         && (this.onControl ? this.onControl != event.ctrlKey : this.onControl == event.ctrlKey)
+         && (this.onAlt ? this.onAlt != event.altKey : this.onAlt == event.altKey)
+    }
+
+    runUp(event) {
+        this.onUp(event)
+    }
   
-    run(event) {
-        this.callback(event)
+    testAndRunUp(event) {
+        if (this.testUp(event)) {
+            console.log(event)
+            this.runUp(event)
+        }
     }
   }

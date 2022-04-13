@@ -11,27 +11,24 @@ export const App = () => {
     const [settingsMenu, setSettingsMenu] = useState(false);
     const [examplesMenu, setExamplesMenu] = useState(false);
     const [theme, setTheme] = useState('')
-    const [numOfAreas, setNumOfAreas] = useState(1);
 
     const globalState = {
         theme: theme
     }
 
+    
+
+
   return (
       <GlobalState.Provider value={globalState}>
 
-        {/* <div className="front-layer">
-
-        </div> */}
-
       <div className='game-area'> 
-        <GameBoard />
         <GameBoard />
       </div>
 
         <Sidebar>
-            <div> Conway's Game Of Life </div>
-            <button className={`examples-button ${examplesMenu ? 'opened' : ''}`} onClick={() => setExamplesMenu(!examplesMenu)}> Examples </button>
+            <div> Conway's Game Of Life <br /> Made By: Jacoby Johnson </div>
+            {/* <button className={`examples-button ${examplesMenu ? 'opened' : ''}`} onClick={() => setExamplesMenu(!examplesMenu)}> Examples </button>
             { examplesMenu && <div className='examples'>
               Examples
               </div> }
@@ -42,7 +39,7 @@ export const App = () => {
                     <button onClick={() => theme != 'dark' ? setTheme('dark') : setTheme('')} className={theme == 'dark' ? 'on' : ''}> <FaMoon /> Dark Mode <FaMoon /> </button>
                 </div>
 
-              </div>}
+              </div>} */}
 
             <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
             { aboutMenu && <div className='about'>
@@ -53,6 +50,9 @@ export const App = () => {
 
                 Be Creative!
               </div>}
+
+            <a href="https://www.github.com/cobyj33/Conway" target="_blank"> <button> Project Link </button> </a>
+            <a href="https://www.github.com/cobyj33/" target="_blank"> <button> Other Creations </button> </a>
         </Sidebar>
       </GlobalState.Provider>
   )

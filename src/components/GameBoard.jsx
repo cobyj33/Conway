@@ -4,16 +4,18 @@ import { FaArrowsAlt, FaEraser, FaBrush, FaBackspace, FaRegTrashAlt, FaSearch, F
 import { BsBoundingBox } from "react-icons/bs"
 import { AiFillCloseCircle } from "react-icons/ai"
 import "./gameboard.css"
+import { ToolTip } from './ToolTip/ToolTip.jsx'
 
 //edit modes: draw, erase, pan, zoom, select
 
-export const GameBoard = ( { sendBoardData } ) => {
+export const GameBoard = ( { sendBoardData, removeCallback } ) => {
   const canvasRef = useRef()
+  const historyStack = useRef([])
     const [animating, setAnimating] = useState(false)
     const [selections, setSelections] = useState([])
     const [currentGeneration, setCurrentGeneration] = useState(0)
     const [pattern, setPattern] = useState([{row: 0, col: 0}])
-    const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 5, 2))
+    const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 0, 0))
     const [view, setView] = useState({
         coordinates: { //x is cols, y is rows
             row: 0,
@@ -23,7 +25,6 @@ export const GameBoard = ( { sendBoardData } ) => {
     })
 
     const [editMode, setEditMode] = useState('draw')
-
     const [settings, setSettings] = useState({
       tickSpeed: 5,
       randomizeAmount: 10,
@@ -105,11 +106,11 @@ export const GameBoard = ( { sendBoardData } ) => {
     }
    
     const DragBrush = (event) => {
-        if (!isDragging.current || event.shiftKey || event.ctrlKey || event.altKey || animating || movingSelectedArea.current) return
+        if (!isDragging.current || !(editMode == 'draw' || editMode == 'erase') || movingSelectedArea.current) return
         const cell = getHoveredCell(event);
-        if (dragMode.current == 'erasing') {
+        if (editMode == 'erase') {
             setSelections(selections.filter(sel => !isEqualSelection(cell, sel)))
-        } else if (dragMode.current == 'drawing') {
+        } else if (editMode == 'draw') {
             if (!isSelected(cell)) {
                 setSelections(selections.concat(cell))
             }
@@ -118,7 +119,7 @@ export const GameBoard = ( { sendBoardData } ) => {
 
     const lastMousePosition = useRef({x: 0, y: 0})
     const mousePan = (event) => {
-        if (!event.shiftKey || event.ctrlKey || !isDragging.current) return
+        if (editMode != 'pan' || !isDragging.current) return
         const {x: lastX, y: lastY} = lastMousePosition.current
         if (lastX == 0 && lastY == 0) {
             lastMousePosition.current = getMousePositionInCanvas(event)
@@ -135,7 +136,7 @@ export const GameBoard = ( { sendBoardData } ) => {
     }
 
     const mouseZoom = event => {
-        if (!event.ctrlKey || event.shiftKey || !isDragging.current) return
+        if (editMode != 'zoom' || !isDragging.current) return
         const {x: lastX, y: lastY} = lastMousePosition.current
         if (lastX == 0 && lastY == 0) {
             lastMousePosition.current = getMousePositionInCanvas(event)
@@ -150,12 +151,11 @@ export const GameBoard = ( { sendBoardData } ) => {
 
     
     const select = (centerSelection) => {
-        if (isSelected(centerSelection)) {
-            console.log('selected')
+        if (editMode == 'erase') {
             setSelections(selections.filter(sel => 
             !pattern.some(patternCell => 
             isEqualSelection(new Selection(patternCell.row + centerSelection.row, patternCell.col + centerSelection.col), sel))))
-        } else {
+        } else if (editMode == 'draw') {
             setSelections(selections.concat(...pattern.map(sel => new Selection(sel.row + centerSelection.row, sel.col + centerSelection.col))))
         }
     }
@@ -164,14 +164,14 @@ export const GameBoard = ( { sendBoardData } ) => {
     const selectedAreaAnchor = useRef(new Selection(0, 0))
 
     const startAreaSelection = (event) => {
-        if (!event.altKey || event.shiftKey || event.ctrlKey) return
+        if (editMode != 'select') return
         const hoveredCell = getHoveredCell(event)
         selectedAreaAnchor.current = hoveredCell;
         setSelectedArea(new Area(hoveredCell.row, hoveredCell.col, 1, 1))
     }
 
     const selectingArea = (event) => {
-        if (!event.altKey || event.shiftKey || event.ctrlKey || !isDragging.current) return
+        if (editMode != 'select' || !isDragging.current) return
 
         const hoveredCell = getHoveredCell(event)
         const anchor = selectedAreaAnchor.current
@@ -191,7 +191,7 @@ export const GameBoard = ( { sendBoardData } ) => {
     }
 
     const moveSelectedArea = event => {
-        if (event.ctrlKey || event.shiftKey || !movingSelectedArea.current) return
+        if (editMode != 'select' || !movingSelectedArea.current) return
         const {x: lastX, y: lastY} = lastMousePosition.current
         if (lastX == 0 && lastY == 0) {
             lastMousePosition.current = getMousePositionInCanvas(event)
@@ -363,29 +363,39 @@ export const GameBoard = ( { sendBoardData } ) => {
     })
 
     const keyEvents = [
-        new KeyBinding({key: "Enter", callback: () => setAnimating(!animating)}),
-        new KeyBinding({key: "Delete", callback: () => clear()}),
-        new KeyBinding({key: "-", callback: () => setView({...view, zoom: view.zoom - 0.05 })}),
-        new KeyBinding({key: "=", callback: () => setView({...view, zoom: view.zoom + 0.05 })}),
-        new KeyBinding({key: "w", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row - 1}})}),
-        new KeyBinding({key: "a", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col - 1}})}),
-        new KeyBinding({key: "s", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row + 1}})}),
-        new KeyBinding({key: "d", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col + 1}})}),
-        new KeyBinding({key: "UpArrow", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row - 1}})}),
-        new KeyBinding({key: "LeftArrow", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col - 1}})}),
-        new KeyBinding({key: "DownArrow", callback: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row + 1}})}),
-        new KeyBinding({key: "RightArrow", callback: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col + 1}})})
+        new KeyBinding({key: "Enter", onDown: () => setAnimating(!animating)}),
+        new KeyBinding({key: "Delete", onDown: () => clear()}),
+        new KeyBinding({key: "-", onDown: () => setView({...view, zoom: view.zoom - 0.05 })}),
+        new KeyBinding({key: "=", onDown: () => setView({...view, zoom: view.zoom + 0.05 })}),
+        new KeyBinding({key: "UpArrow", onDown: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row - 1}})}),
+        new KeyBinding({key: "LeftArrow", onDown: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col - 1}})}),
+        new KeyBinding({key: "DownArrow", onDown: () => setView({...view, coordinates: {...view.coordinates, row: view.coordinates.row + 1}})}),
+        new KeyBinding({key: "RightArrow", onDown: () => setView({...view, coordinates: {...view.coordinates, col: view.coordinates.col + 1}})}),
+        new KeyBinding({key: "1", onDown: () => setEditMode('draw')}),
+        new KeyBinding({key: "2", onDown: () => setEditMode('erase')}),
+        new KeyBinding({key: "3", onDown: () => setEditMode('pan')}),
+        new KeyBinding({key: "4", onDown: () => setEditMode('zoom')}),
+        new KeyBinding({key: "5", onDown: () => setEditMode('select')}),
+        new KeyBinding({key: "Escape", onDown: () => removeCallback?.() }),
+        new KeyBinding({key: "Shift", onDown: () => setEditMode('pan'), onUp: () => setEditMode('draw')}),
+        new KeyBinding({key: "Control", onDown: () => setEditMode('zoom'), onUp: () => setEditMode('draw')}),
+        new KeyBinding({key: "Alt", onDown: () => setEditMode('select'), onUp: () => setEditMode('draw')}),
     ]
 
     function keyListener(keyEvent) {
         console.log(keyEvent.key)
-        keyEvents.forEach(binding => binding.testAndRun(keyEvent))
+        keyEvents.forEach(binding => binding.testAndRunDown(keyEvent))
+    }
+
+    function keyUpListener(keyEvent) {
+        console.log(' on up ', keyEvent)
+        keyEvents.forEach(binding => binding.testAndRunUp(keyEvent))
     }
 
     function mouseDownListener(mouseEvent) {
         isDragging.current = true;
         startAreaSelection(mouseEvent)
-        if (mouseEvent.shiftKey || mouseEvent.altKey || mouseEvent.ctrlKey) return
+        if (editMode !== 'draw' || editMode !== 'erase') return
 
         if (clickedSelectedArea(mouseEvent)) {
             movingSelectedArea.current = true;
@@ -404,7 +414,7 @@ export const GameBoard = ( { sendBoardData } ) => {
         mouseZoom(mouseEvent); 
         drawMouseShadow(mouseEvent); 
         selectingArea(mouseEvent);
-        moveSelectedArea(mouseEvent)
+        moveSelectedArea(mouseEvent);
     }
 
     const onMouseUp = (event) => {
@@ -428,11 +438,18 @@ export const GameBoard = ( { sendBoardData } ) => {
 
     const [showBoardData, setShowBoardData] = useState(false)
 
-
+    let cursor = 'auto'
+    switch (editMode) {
+        case 'draw': cursor = 'url("https://img.icons8.com/ios-glyphs/30/000000/pencil-tip.png"), crosshair'; break;
+        case 'zoom': cursor = 'url("https://img.icons8.com/external-royyan-wijaya-detailed-outline-royyan-wijaya/24/000000/external-magnifying-glass-interface-royyan-wijaya-detailed-outline-royyan-wijaya.png"), nwse-resize'; break;
+        case 'erase': cursor = 'url("https://img.icons8.com/material-rounded/24/000000/eraser.png"), crosshair'; break;
+        case 'pan': cursor = 'move'; break;
+        case 'select': cursor = 'crosshair'; break;
+    }
 
   return (
     <div className='game-board'>
-        <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onMouseUp} onMouseLeave={onMouseUp} onMouseMove={mouseMoveListener} onKeyDown={keyListener} tabIndex={0} />
+        <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onMouseUp} onMouseLeave={onMouseUp} onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} tabIndex={0} style={{cursor: cursor}}/>
         { animating && <div className='animating-ui'>
                 <h3 className='generation-display'> Current Generation: { currentGeneration } </h3>
                 <div className='flex-column'>
@@ -441,34 +458,34 @@ export const GameBoard = ( { sendBoardData } ) => {
                 </div>
              </div>}
 
-        <div className='game-display-information flex-column'>
-            <button onClick={() => setShowBoardData(!showBoardData)}> <FaChevronCircleDown /> </button>
-
-            { showBoardData && 
-            <>
-              <div className='coordinate-display flex-column' >
-                  View <br/>
-                  Row: <span> {Math.round(view.coordinates.row * 100) / 100} </span> <br/>
-                  Col: <span> {Math.round(view.coordinates.col * 100) / 100} </span> <br/>
-              </div>
-
-              <label htmlFor='zoom-input'> Zoom: {Math.round(view.zoom * 100) / 100} </label>
-              <input type="range" id='zoom-input' min="0.05" max='3' step="0.05" value={view.zoom} onChange={(event) => setView({...view, zoom: Number(event.target.value)}) }/>
-            </> } 
-        </div>
-
         <div className='game-toolbar flex-row'>
             
 
-            <button onClick={() => editMode == 'pan' ? 'draw' : 'pan'}> <FaArrowsAlt /> </button>
-            <button onClick={() => editMode == 'zoom' ? 'draw' : 'zoom'}> <FaSearch /> </button>
-            <button onClick={() => editMode == 'select' ? 'draw' : 'select'}> <BsBoundingBox /> </button>
-            <button onClick={() => editMode == 'erase' ? 'draw' : 'erase'}> <FaEraser /> </button>
-            <button onClick={() => editMode == 'draw' ? 'draw' : 'draw'}> <FaBrush /> </button>
-            <button onClick={() => setAnimating(!animating)}> <FaPlay /> </button>
-            <button> <FaBackspace /> </button>
-            <button onClick={clear}> <FaRegTrashAlt /> </button> 
-            <button onClick={() => console.log(this)}> <AiFillCloseCircle /> </button> 
+            <button onClick={() => editMode != 'draw' ? setEditMode('draw') : ''} className={`game-tool ${editMode == 'draw' ? 'selected' : 'unselected'}`}> <FaBrush /> <ToolTip> 1: Draw </ToolTip> </button>
+            <button onClick={() => editMode != 'erase' ? setEditMode('erase') : ''} className={`game-tool ${editMode == 'erase' ? 'selected' : 'unselected'}`}> <FaEraser /> <ToolTip> 2: Erase </ToolTip> </button>
+            <button onClick={() => editMode != 'pan' ? setEditMode('pan') : ''} className={`game-tool ${editMode == 'pan' ? 'selected' : 'unselected'}`}> <FaArrowsAlt /> <ToolTip> 3 (Shift + Drag): Pan </ToolTip> </button>
+            <button onClick={() => editMode != 'zoom' ? setEditMode('zoom') : ''} className={`game-tool ${editMode == 'zoom' ? 'selected' : 'unselected'}`}>  <FaSearch /> <ToolTip> 4 (Ctrl + Drag): Zoom </ToolTip> </button>
+            <button onClick={() => editMode != 'select' ? setEditMode('select') : ''} className={`game-tool ${editMode == 'select' ? 'selected' : 'unselected'}`}> <BsBoundingBox /> <ToolTip> 5 (Alt + Drag): Select </ToolTip> </button>
+            <button onClick={() => setAnimating(!animating)} className={`game-tool ${animating ? "selected" : 'unselected'}`}> <FaPlay /> <ToolTip> Enter: Play </ToolTip> </button>
+            {/* <button> <FaBackspace /> </button> */}
+            <button onClick={clear} className={`game-tool`}> <FaRegTrashAlt /> <ToolTip> Delete: Clear </ToolTip> </button> 
+
+            <div className='flex-column'>
+                <button onClick={() => setShowBoardData(!showBoardData)} className={`game-tool ${showBoardData ? 'selected' : 'unselected'}`}> <FaChevronCircleDown />  <ToolTip> Board Data </ToolTip> </button>
+
+                { showBoardData && 
+                <div className='game-display-information'>
+                    <div className='coordinate-display flex-column' >
+                        View <br/>
+                        Row: <span> {Math.round(view.coordinates.row * 100) / 100} </span> <br/>
+                        Col: <span> {Math.round(view.coordinates.col * 100) / 100} </span> <br/>
+                    </div>
+
+                    <label htmlFor='zoom-input'> Zoom: {Math.round(view.zoom * 100) / 100} </label>
+                    <input type="range" id='zoom-input' min="0.05" max='3' step="0.05" value={view.zoom} onChange={(event) => setView({...view, zoom: Number(event.target.value)}) }/>
+                </div> } 
+        </div>
+            <button onClick={() => removeCallback?.()} className={`game-tool`}> <AiFillCloseCircle /> <ToolTip> Esc: Exit </ToolTip> </button> 
         </div>
     </div>
   )
