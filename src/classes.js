@@ -1,4 +1,4 @@
-
+import { cloneDeep } from 'lodash'
 export class Selection {
     constructor(row, col) {
         this.row = row
@@ -78,5 +78,43 @@ export class Selection {
             console.log(event)
             this.runUp(event)
         }
+    }
+  }
+
+let boardIDs = 0;
+export class BoardData {
+    constructor(previousData) {
+      if (previousData instanceof BoardData) {
+        const clonedData = cloneDeep(previousData)
+        Object.keys(clonedData).forEach(prop => this[prop] = clonedData[prop])
+      }
+      this.id = ++boardIDs;
+  
+      this.selections = []
+      this.selectionsBeforeAnimation = []
+      this.pattern = [{row: 0, col: 0}];
+      this.playback = {
+        enabled: false,
+        paused: false,
+        currentGeneration: 1,
+      }
+  
+      this.historyStack = []
+  
+      this.view = {
+        coordinates: {
+          row: 0,
+          col: 0
+        },
+        zoom: 1
+      }
+  
+      this.settings = {
+        tickSpeed: 5,
+        randomizeAmount: 10,
+        isScreenFit: false,
+      }
+  
+      this.editMode = 'draw'
     }
   }
