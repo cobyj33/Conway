@@ -1,0 +1,55 @@
+.drag-selector {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .drag-selector.oriented {
+    background-color: black;
+  }
+  
+  .drag-selector.top {
+    height: max(5%, 10px);
+    width: 100%;
+    top: 0;
+    left: 0;
+  }
+  
+  .drag-selector.bottom {
+    height: max(5%, 10px);
+    width: 100%;
+    bottom: 0;
+    left: 0;
+  }
+  
+  .drag-selector.left {
+    height: 100%;
+    width: 10px;
+    top: 0;
+    left: 0;
+  }
+  
+  .drag-selector.right {
+    height: 100%;
+    width: 10px;
+    top: 0;
+    right: 0;
+  }
+  
+  
+  
+  .drag-selector.oriented:hover {
+    transition: background-color 0.2s;
+    background-color: #222;
+  }
+  
+  .drag-selector.oriented:active {
+    transition: background-color 0.2s;
+    background-color: #444;
+  }

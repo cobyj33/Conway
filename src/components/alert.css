@@ -1,0 +1,19 @@
+.alert {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    border: none;
+    border-top: lightgreen 2px solid;
+    background-color: white;
+    color: black;
+}
+
+.alert-close {
+    background-color: none;
+    border: none;
+}
