@@ -1,19 +1,34 @@
 import {useRef, useState, useEffect} from 'react'
 import { Area, Selection, KeyBinding } from '../classes.js'
-import { FaArrowsAlt, FaEraser, FaBrush, FaBackspace, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown } from "react-icons/fa"
+import { FaArrowsAlt, FaEraser, FaBrush, FaBackspace, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaFill, FaChessKing } from "react-icons/fa"
 import { BsBoundingBox } from "react-icons/bs"
 import { AiFillCloseCircle } from "react-icons/ai"
 import "./gameboard.css"
 import { ToolTip } from './ToolTip/ToolTip.jsx'
+import { shuffle } from 'lodash'
 
 //edit modes: draw, erase, pan, zoom, select
-const DefaultScreenCellSpan = 10;
+const DEFAULT_SCREEN_CELL_SPAN = 10;
+const MAX_FILL_DEPTH = 100;
+const MAX_CELL_WANDER_DISTANCE = 1000;
 
-export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
+export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
+    const alterData = (accessor, newValue) => boardDatasDispatch({ type: 'alter', id: boardData.id, request: { accessor: accessor, newValue: newValue} })
+    const removeCallback = () => boardDatasDispatch({type: 'remove', id: boardData.id})
     const canvasRef = useRef()
     const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 0, 0))
     const [displayBackToCenter, showDisplayBackToCenter] = useState(false);
-    const { settings, view, selections, editMode } = boardData
+    const [tempSelections, setTempSelections] = useState([]);
+    const [brush, setBrush] = useState({
+        type: 'pixel',
+        size: 1,
+        paint: 'cell',
+        extra: {
+            lineStart: undefined
+        }
+    });
+    const { id, settings, view, selections, editMode } = boardData
+
 
     const resizeCanvas = () => {
         if (!canvasRef.current) return
@@ -26,14 +41,16 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
     const lastGeneration = useRef([])
     const lastTick = useRef(Date.now())
     const isDragging = useRef(false)
+    const lastHoveredCell = useRef(new Selection(0, 0))
     const getMillisecondsPerTick = () => 1000 / boardData.settings.tickSpeed
     const getContext = () => canvasRef.current.getContext("2d")
     const getCanvasBounds = () => canvasRef.current.getBoundingClientRect()
-    const getCellSize = () => Math.min(getCanvasBounds().width, getCanvasBounds().height) / (DefaultScreenCellSpan / Math.max(0.05, boardData.view.zoom)) //10 is the default span for the viewbox
-    const getZoomfromCellSize = (cellSize) => (DefaultScreenCellSpan * cellSize) / Math.min(getCanvasBounds().width, getCanvasBounds().height)
+    const getCellSize = (zoom = boardData.view.zoom) => Math.min(getCanvasBounds().width, getCanvasBounds().height) / (DEFAULT_SCREEN_CELL_SPAN / Math.max(0.05, zoom)) //10 is the default span for the viewbox
+    const getZoomfromCellSize = (cellSize) => (DEFAULT_SCREEN_CELL_SPAN * cellSize) / Math.min(getCanvasBounds().width, getCanvasBounds().height)
     const getCellsHorizontallyAcrossScreen = () => getCanvasBounds().width / getCellSize()
     const getCellsVerticallyAcrossScreen = () => getCanvasBounds().height / getCellSize()
     const getAspectRatio = () => canvasRef.current ? canvasRef.current.width / canvasRef.current.height : (16 / 9)
+    const getCenterCell = () => new Selection(Math.round(view.coordinates.row + getCellsVerticallyAcrossScreen() / 2), Math.round(view.coordinates.col + getCellsHorizontallyAcrossScreen() / 2))
     const getViewArea = () => {
         const {row: viewRow, col: viewCol} = boardData.view.coordinates;
         const viewWidth = getCanvasBounds().width / getCellSize();
@@ -78,14 +95,32 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         })
     }
 
-    const cloneSelections = (selectionList) => selectionList.map(({row, col}) => new Selection(row, col))
+    function centerCamera({row = 0, col = 0}) {
+        alterData('view', {...boardData.view, coordinates: {
+            row: row - getCellsVerticallyAcrossScreen() / 2,
+            col: col - getCellsHorizontallyAcrossScreen() / 2
+            }
+        })
+    }
+
+    const cloneSelections = (selectionList) => selectionList.map(sel => new Selection(sel.row, sel.col))
 
     function clear() {
         lastGeneration.current = []
-        alterData('selectionsBeforeAnimation', [])
         alterData('selections', [])
-        alterData('playback.currentGeneration', 0)
       }
+
+    function undo() {
+        if (boardData.playback.enabled) {
+            console.error("cannot undo during playback");
+            return
+        }
+
+        const lastBoardState = boardData.popHistory();
+        if (!lastBoardState) return
+        boardDatasDispatch({type: 'set state', newState: lastBoardState, id: boardData.id});
+    }
+  
 
     const isStable = () => selections.every(cell => lastGeneration.current.some(lastCell => isEqualSelection(cell, lastCell))) && lastGeneration.current.length == selections.length
     const getMousePositionInCanvas = (mouseEvent) => {
@@ -117,6 +152,38 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         }
     }
 
+    function fill(selection, depth = 0, selectionsToAdd = []) {
+        console.log('filling ', selection);
+        if (depth > MAX_FILL_DEPTH) return
+
+        const neighbors = shuffle(getAdjacentNeighbors(selection))
+        neighbors.forEach(neighbor => {
+            if (!isSelected(neighbor) && !selectionsToAdd.some(sel => sel.row === neighbor.row && sel.col === neighbor.col)) {
+                selectionsToAdd.push(neighbor);
+                fill(neighbor, depth + 1, selectionsToAdd)
+            }
+        })
+
+        if (depth > 0)
+            return 
+
+        console.log('selections to add', selectionsToAdd);
+        console.log('selections', selections);
+        console.log('addition', selections.concat(...selectionsToAdd))
+        alterData('selections', selections.concat(...selectionsToAdd));
+    }
+
+    function getLine(firstPoint, secondPoint) {
+        const slope = (firstPoint.col - secondPoint.col) !== 0 ? -(firstPoint.row - secondPoint.row) / (firstPoint.col - secondPoint.col) : Number.MAX_SAFE_INTEGER
+        const intersections = []
+
+        const possibleArea = Area.corners(firstPoint, secondPoint)
+        console.log(possibleArea);
+        console.log(slope);
+
+        alterData('selections', removeDuplicates(selections.concat(intersections)))
+    }
+
     const lastMousePosition = useRef({x: 0, y: 0})
 
     const mousePan = (event) => {
@@ -131,10 +198,10 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         const colOffset = (currentX - lastX) / getCellSize();
         const rowOffset = (currentY - lastY) / getCellSize();
         const { view } = boardData
-        lastMousePosition.current = getMousePositionInCanvas(event)
+        lastMousePosition.current = getMousePositionInCanvas(event) 
         alterData('view.coordinates', { row: view.coordinates.row + rowOffset, col: view.coordinates.col + colOffset})
     }
-
+    
     const mouseZoom = event => {
         if (editMode != 'zoom' || !isDragging.current) return
         const {x: lastX, y: lastY} = lastMousePosition.current
@@ -147,7 +214,20 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         const zoomOffset = (currentY - lastY) / 100;
         const { view } = boardData;
         lastMousePosition.current = getMousePositionInCanvas(event)
-        alterData('view.zoom', view.zoom + zoomOffset)
+
+        const newZoom = view.zoom + zoomOffset;
+        const newCellSize = getCellSize(newZoom)
+        const canvas = canvasRef.current;
+        const changeInHorizontalCellSpan = getCellsHorizontallyAcrossScreen() - (canvas.width / newCellSize);
+        const changeInVerticalCellSpan = getCellsVerticallyAcrossScreen() - (canvas.height / newCellSize);
+        alterData('view', {
+            coordinates: {
+                row: view.coordinates.row + ( changeInVerticalCellSpan / 2 ),
+                col: view.coordinates.col + ( changeInHorizontalCellSpan / 2)
+            },
+            zoom: view.zoom + zoomOffset
+        })
+        // alterData('view.coordinates', {row: centerCell.row - (canvas.height / newCellSize / 2), col: view.coordinates.col - (canvas.width / newCellSize / 2)})
     }
 
     
@@ -240,14 +320,39 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         context.beginPath()
         if (!boardData.playback.enabled) {
             for (let row = rowStart - 1; row < rowEnd + 1; row++) {
+                if (row == 0) {
+                    context.stroke();
+                    context.beginPath();
+                }
+
                 context.moveTo(0, (row - view.coordinates.row) * cellSize);
                 context.lineTo(canvas.width,  (row - view.coordinates.row) * cellSize)
+
+                if (row == 0) {
+                    context.lineWidth = 2;
+                    context.stroke();
+                    context.lineWidth = 1;
+                    context.beginPath();
+                }
             }
 
             for (let col = colStart - 1; col < colEnd + 1; col++) {
+                if (col == 0) {
+                    context.stroke();
+                    context.beginPath();
+                }
+
                 context.moveTo((col - view.coordinates.col) * cellSize, 0)
                 context.lineTo((col - view.coordinates.col) * cellSize, canvas.height)
+
+                if (col == 0) {
+                    context.lineWidth = 2;
+                    context.stroke();
+                    context.lineWidth = 1;
+                    context.beginPath();
+                }
             }   
+
             context.stroke();
         }
 
@@ -256,7 +361,6 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         context.globalAlpha = 1;
     }
 
-    const lastHoveredCell = useRef(new Selection(0, 0))
     const drawMouseShadow = (event) => {
         const { pattern, view } = boardData
         const hoveredCell = getHoveredCell(event)
@@ -292,6 +396,16 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         return neighbors
     }
 
+    function getAdjacentNeighbors(selection) {
+        const {row: centerRow, col: centerCol} = selection
+        return [
+            new Selection(centerRow - 1, centerCol),
+            new Selection(centerRow + 1, centerCol),
+            new Selection(centerRow, centerCol - 1),
+            new Selection(centerRow, centerCol + 1)
+        ]
+    }
+
     const fitGap = 5
     function screenFit() {
         if (isEmpty()) return
@@ -320,14 +434,6 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         })
     }
 
-    function centerCamera({row = 0, col = 0}) {
-        alterData('view', {...boardData.view, coordinates: {
-            row: row - getCellsVerticallyAcrossScreen() / 2,
-            col: col - getCellsHorizontallyAcrossScreen() / 2
-            }
-        })
-    }
-
     function getLiveNeighbors(selection) {
         return getNeighbors(selection).filter(sel => isSelected(sel))
     }
@@ -337,12 +443,14 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
     }
 
     function tick() {
-        const testCells = getAreasToCheck().map(cell => new Selection(cell.row, cell.col));
+        const centerOfView = getViewArea().center;
+        const testCells = getAreasToCheck().map(cell => new Selection(cell.row, cell.col)).filter(cell => cell.distanceFrom(centerOfView) < MAX_CELL_WANDER_DISTANCE);
         const nextGenFilter = cell => {
             const numOfLiveNeighbors = getLiveNeighbors(cell).length
             if (isSelected(cell)) {
                 return numOfLiveNeighbors === 2 || numOfLiveNeighbors === 3 
-            }
+            } 
+
             return numOfLiveNeighbors === 3
         }
 
@@ -376,8 +484,9 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         console.log("started animating");
         
         if (boardData.playback.enabled) {
-            alterData('selections', removeDuplicates(boardData.selections))
+            const selections = removeDuplicates(boardData.selections)
             alterData('selectionsBeforeAnimation', cloneSelections(selections))
+            alterData('selections', selections)
         } else {
             lastGeneration.current = []
             frameRequested.current = false;
@@ -406,7 +515,7 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
             frameRequested.current = true;
             getNextTick()
         }
-    })
+    }, [boardData.selections])
 
     const keyEvents = [
         new KeyBinding({key: "Enter", onDown: () => alterData('playback.enabled', !boardData.playback.enabled)}),
@@ -427,8 +536,43 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         new KeyBinding({key: "Shift", onDown: () => alterData('editMode', 'pan'), onUp: () => alterData('editMode', 'draw')}),
         new KeyBinding({key: "Control", onDown: () => alterData('editMode', 'zoom'), onUp: () => alterData('editMode', 'draw')}),
         new KeyBinding({key: "Alt", onDown: () => alterData('editMode', 'select'), onUp: () => alterData('editMode', 'draw')}),
-        new KeyBinding({key: "r", onDown: () => randomizeSelections() })
+        new KeyBinding({key: "r", onDown: () => randomizeSelections() }),
+        new KeyBinding({key: 'z', onControl: true, onDown: undo}),
+        new KeyBinding({key: 'c', onControl: true, onDown: copy}),
+        new KeyBinding({key: 'v', onControl: true, onDown: paste}),
+        new KeyBinding({key: 's', onControl: true, onDown: paste}),
+        // new KeyBinding({key: 'BackSpace', onDown: })
     ]
+
+    function copy() {
+        console.log('copy');
+        if (selectedArea.area <= 0) return
+        if (boardData.playback.enabled) return
+
+        const center = new Selection(Math.round(selectedArea.row + selectedArea.height / 2), Math.round(selectedArea.col + selectedArea.width / 2))
+        const copied = selections.filter(cell => selectedArea.containsArea(cell)).map(cell => new Selection(cell.row - center.row, cell.col - center.col))
+        localStorage.setItem(`Copy Data: Board ID #${boardData.id}`, JSON.stringify(copied));
+    }
+
+    function paste() {
+        console.log('paste');
+        if (localStorage.getItem(`Copy Data: Board ID #${boardData.id}`) == null) return
+        if (boardData.playback.enabled) return
+
+        
+        const focusCell = lastHoveredCell.current;
+        const toPaste = JSON.parse(localStorage.getItem(`Copy Data: Board ID #${boardData.id}`)
+        ).map(cell => new Selection(cell.row + focusCell.row, cell.col + focusCell.col));
+        alterData('selections', selections.concat(...toPaste));
+    }
+
+    function save() {
+        if (selectedArea.area > 0) {
+
+        } else {
+
+        }
+    }
 
     function keyListener(keyEvent) {
         console.log(keyEvent.key)
@@ -436,11 +580,12 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
     }
 
     function keyUpListener(keyEvent) {
-        console.log(' on up ', keyEvent)
+        // console.log(' on up ', keyEvent)
         keyEvents.forEach(binding => binding.testAndRunUp(keyEvent))
     }
 
     function mouseDownListener(mouseEvent) {
+        boardData.pushHistory();
         isDragging.current = true;
         startAreaSelection(mouseEvent)
         if (!(editMode == 'draw' || editMode == 'erase')) return
@@ -450,12 +595,19 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         //     moveSelectedArea(mouseEvent); return;
         // }
 
+
+
         if (clickedSelectedArea(mouseEvent) && mouseEvent.button == 2) {
             setSelectedArea(new Area(0, 0, 0, 0));
         }
 
+        
         if (!boardData.playback.enabled) {
             select(getHoveredCell(mouseEvent))
+            switch(brush.type) {
+                case 'fill': fill(getHoveredCell(mouseEvent)); break;
+                case 'line': setBrush({...brush, extra: {...brush.extra, lineStart: getHoveredCell(mouseEvent)}}); break;
+            }
         }
     }
 
@@ -471,13 +623,28 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
         moveSelectedArea(mouseEvent);
     }
 
-    const onMouseUp = (event) => {
-        event.preventDefault();
+    const onInputStop = (event) => {
         lastMousePosition.current = {x: 0, y: 0}
         isDragging.current = false
         movingSelectedArea.current = false;
         setSelectedArea(new Area(Math.round(selectedArea.row), Math.round(selectedArea.col), Math.round(selectedArea.width), Math.round(selectedArea.height)))
-        alterData('selections', selections.map(sel => new Selection(Math.round(sel.row), Math.round(sel.col))) )
+        // alterData('selections', selections.map(sel => new Selection(Math.round(sel.row), Math.round(sel.col))) )
+    }
+
+    const onContextMenu = (event) => {
+        event.preventDefault();
+
+
+
+        onInputStop();
+    }
+    
+    const onMouseUp = (event) => {
+        console.log("MOUSE UP");
+        if (brush.type == 'line') {
+            getLine(brush.extra.lineStart, getHoveredCell(event))
+        }
+        onInputStop(event);
     }
 
     const onMouseEnter = (event) => {
@@ -495,21 +662,25 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
 
 
     const [showBoardDataDisplay, setShowBoardDataDisplay] = useState(false)
+    const [showingDrawingOptions, setShowingDrawingOptions] = useState(false)
 
     let cursor = 'auto'
     switch (editMode) {
-        case 'draw': cursor = 'url("https://img.icons8.com/ios-glyphs/30/000000/pencil-tip.png"), crosshair'; break;
+        case 'draw': switch (brush.type) {
+            case 'pixel':
+            case 'pattern': cursor = 'url("https://img.icons8.com/ios-glyphs/30/000000/pencil-tip.png"), crosshair'; break;
+            case 'fill': cursor = 'url("https://www.pinclipart.com/picdir/big/534-5348253_bucket-icon-png-ms-paint-paint-bucket-tool.png"), crosshair'; break;
+            default: cursor = 'crosshair'; break;
+        } break;
         case 'zoom': cursor = 'url("https://img.icons8.com/external-royyan-wijaya-detailed-outline-royyan-wijaya/24/000000/external-magnifying-glass-interface-royyan-wijaya-detailed-outline-royyan-wijaya.png"), nwse-resize'; break;
         case 'erase': cursor = 'url("https://img.icons8.com/material-rounded/24/000000/eraser.png"), crosshair'; break;
         case 'pan': cursor = 'move'; break;
         case 'select': cursor = 'crosshair'; break;
     }
 
-    
-
   return (
     <div className='game-board'>
-        <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onMouseUp} onMouseEnter={onMouseEnter} onMouseLeave={onMouseUp} onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} tabIndex={0} style={{cursor: cursor}}/>
+        <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onContextMenu} onMouseEnter={onMouseEnter} onMouseLeave={onInputStop} onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} tabIndex={0} style={{cursor: cursor}}/>
         { boardData.playback.enabled && <div className='animating-ui'>
                 <h3 className='generation-display'> Current Generation: { boardData.playback.currentGeneration } </h3>
                 <div className='flex-column'>
@@ -524,8 +695,25 @@ export const GameBoard = ( { boardData, alterData, removeCallback } ) => {
 
         <div className='game-toolbar flex-row'>
             
+            <div className="drawing-options" onMouseLeave={() => setShowingDrawingOptions(false)}>
+                <button onClick={() => editMode != 'draw' ? alterData('editMode', 'draw') : ''} onMouseEnter={() => setShowingDrawingOptions(true)}  className={`game-tool ${boardData.editMode == 'draw' ? 'selected' : 'unselected'}`}> <FaBrush /> <ToolTip> 1: Draw </ToolTip> </button>
+                {showingDrawingOptions && 
+                <div className="drawing-options-menu">
 
-            <button onClick={() => editMode != 'draw' ? alterData('editMode', 'draw') : ''} className={`game-tool ${boardData.editMode == 'draw' ? 'selected' : 'unselected'}`}> <FaBrush /> <ToolTip> 1: Draw </ToolTip> </button>
+                    <div className="flex-column"> 
+                        <button onClick={() => setBrush({...brush, type: 'pixel'})} className={`game-tool ${brush.type == 'pixel' ? 'selected' : 'unselected'}`}> Pixel <ToolTip> Default Pixel Tool </ToolTip> </button>
+                        <button onClick={() => setBrush({...brush, type: 'line'})} className={`game-tool ${brush.type == 'line' ? 'selected' : 'unselected'}`}> Line <ToolTip> Line Tool </ToolTip> </button>
+                        <button onClick={() => setBrush({...brush, type: 'fill'})} className={`game-tool ${brush.type == 'fill' ? 'selected' : 'unselected'}`}> Fill <ToolTip> Fill Tool </ToolTip> </button>
+                        <button onClick={() => setBrush({...brush, type: 'pattern'})} className={`game-tool ${brush.type == 'pattern' ? 'selected' : 'unselected'}`}> Pattern <ToolTip> Pattern Tool </ToolTip> </button>
+                    </div>
+
+                    <div className="flex-column"> 
+                        <button onClick={() => setBrush({...brush, paint: 'cell'})} className={`game-tool ${brush.paint == 'cell' ? 'selected' : 'unselected'}`}> Cell <ToolTip> Default Cell Paint </ToolTip> </button>
+                        <button onClick={() => setBrush({...brush, paint: 'wall'})} className={`game-tool ${brush.paint == 'wall' ? 'selected' : 'unselected'}`}> Wall <ToolTip> Wall Paint </ToolTip> </button>
+                    </div>
+
+                </div> }
+            </div>
             <button onClick={() => editMode != 'erase' ? alterData('editMode', 'erase') : ''} className={`game-tool ${boardData.editMode == 'erase' ? 'selected' : 'unselected'}`}> <FaEraser /> <ToolTip> 2: Erase </ToolTip> </button>
             <button onClick={() => editMode != 'pan' ? alterData('editMode', 'pan') : ''} className={`game-tool ${boardData.editMode == 'pan' ? 'selected' : 'unselected'}`}> <FaArrowsAlt /> <ToolTip> 3 (Shift + Drag): Pan </ToolTip> </button>
             <button onClick={() => editMode != 'zoom' ? alterData('editMode', 'zoom') : ''} className={`game-tool ${boardData.editMode == 'zoom' ? 'selected' : 'unselected'}`}>  <FaSearch /> <ToolTip> 4 (Ctrl + Drag): Zoom </ToolTip> </button>
