@@ -8,7 +8,7 @@
     position: absolute;
     left: 0;
     top: 0;
-    background-color: #111;
+    background: linear-gradient(to right, #444, #888);
     border-radius: 10px;
     border: 2px solid black;
 }

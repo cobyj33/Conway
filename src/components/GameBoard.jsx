@@ -1,24 +1,29 @@
-import {useRef, useState, useEffect} from 'react'
+import {useRef, useState, useEffect, useTransition} from 'react'
 import { Area, Selection, KeyBinding } from '../classes.js'
-import { FaArrowsAlt, FaEraser, FaBrush, FaBackspace, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaFill, FaChessKing } from "react-icons/fa"
+import { FaArrowsAlt, FaEraser, FaBrush, FaBackspace, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaFill, FaChessKing, FaWindowClose, FaUndo } from "react-icons/fa"
 import { BsBoundingBox } from "react-icons/bs"
-import { AiFillCloseCircle } from "react-icons/ai"
+import { AiFillCloseCircle, AiTwotoneQuestionCircle } from "react-icons/ai"
 import "./gameboard.css"
 import { ToolTip } from './ToolTip/ToolTip.jsx'
 import { shuffle } from 'lodash'
+import { isCellInSortedSelections, binarySearch } from '../functions.js'
 
 //edit modes: draw, erase, pan, zoom, select
 const DEFAULT_SCREEN_CELL_SPAN = 10;
 const MAX_FILL_DEPTH = 100;
 const MAX_CELL_WANDER_DISTANCE = 1000;
+const MIN_ZOOM = 0.05
 
-export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
+export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, closable = true } ) => {
     const alterData = (accessor, newValue) => boardDatasDispatch({ type: 'alter', id: boardData.id, request: { accessor: accessor, newValue: newValue} })
-    const removeCallback = () => boardDatasDispatch({type: 'remove', id: boardData.id})
+    const removeCallback = () => { if (closable) { boardDatasDispatch({type: 'remove', id: boardData.id}) } }
     const canvasRef = useRef()
-    const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 0, 0))
+    const boardRef = useRef()
+    const [isPending, startTransition] = useTransition()
+    const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 0, 0));
     const [displayBackToCenter, showDisplayBackToCenter] = useState(false);
     const [tempSelections, setTempSelections] = useState([]);
+    const [canvasTooltip, setCanvasTooltip] = useState("")
     const [brush, setBrush] = useState({
         type: 'pixel',
         size: 1,
@@ -45,7 +50,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
     const getMillisecondsPerTick = () => 1000 / boardData.settings.tickSpeed
     const getContext = () => canvasRef.current.getContext("2d")
     const getCanvasBounds = () => canvasRef.current.getBoundingClientRect()
-    const getCellSize = (zoom = boardData.view.zoom) => Math.min(getCanvasBounds().width, getCanvasBounds().height) / (DEFAULT_SCREEN_CELL_SPAN / Math.max(0.05, zoom)) //10 is the default span for the viewbox
+    const getCellSize = (zoom = boardData.view.zoom) => Math.min(getCanvasBounds().width, getCanvasBounds().height) / (DEFAULT_SCREEN_CELL_SPAN / Math.max(MIN_ZOOM, zoom)) //10 is the default span for the viewbox
     const getZoomfromCellSize = (cellSize) => (DEFAULT_SCREEN_CELL_SPAN * cellSize) / Math.min(getCanvasBounds().width, getCanvasBounds().height)
     const getCellsHorizontallyAcrossScreen = () => getCanvasBounds().width / getCellSize()
     const getCellsVerticallyAcrossScreen = () => getCanvasBounds().height / getCellSize()
@@ -80,16 +85,34 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
         return selection.row >= rowStart && selection.row < rowEnd && selection.col >= colStart && selection.col < colEnd
     }
 
-    const isSelected = ({row, col}) => selections.some(sel => sel.row === row && sel.col === col)
+    // const isSelected = ({row, col}) => selections.some(sel => sel.row === row && sel.col === col)
+    const isSelected = (selection) => isCellInSortedSelections(selection, selections)
+
+
+
     const isEmpty = () => selections.length == 0
     const isEqualSelection = (first, second) => first.row === second.row && first.col === second.col
+    // const removeDuplicates = (selectionList) => {
+    //     const tracker =[]
+    //     return selectionList.filter(selection => {
+    //         if (tracker.some(cell => isEqualSelection(cell, selection))) {
+    //             return false
+    //         } else {
+    //             tracker.push(selection)
+    //             return true
+    //         }
+    //     })
+    // }
+
     const removeDuplicates = (selectionList) => {
-        const tracker = []
-        return selectionList.filter(selection => {
-            if (tracker.some(cell => isEqualSelection(cell, selection))) {
-                return false
+        const tracker = {}
+    
+        return selectionList.filter(cell => {
+            const cellString = cell.toString();
+            if (cellString in tracker) {
+                return false;
             } else {
-                tracker.push(selection)
+                tracker[cellString] = 1
                 return true
             }
         })
@@ -103,7 +126,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
         })
     }
 
-    const cloneSelections = (selectionList) => selectionList.map(sel => new Selection(sel.row, sel.col))
+    const cloneSelections = (selectionList) => selectionList.map(sel => Selection.clone(sel))
 
     function clear() {
         lastGeneration.current = []
@@ -122,7 +145,17 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
     }
   
 
-    const isStable = () => selections.every(cell => lastGeneration.current.some(lastCell => isEqualSelection(cell, lastCell))) && lastGeneration.current.length == selections.length
+    const isStable = (current = boardData.selections, last = lastGeneration.current) => {
+        if (last.length !== current.length) return false
+
+        for (let i = 0; i < current.length; i++) {
+            if (!last.some(cell => isEqualSelection(cell, current[i])))
+                return false
+        }
+
+        return true
+    }
+
     const getMousePositionInCanvas = (mouseEvent) => {
         if (!canvasRef.current) return {x: 0, y: 0}
         const bounds = getCanvasBounds()
@@ -174,15 +207,77 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
     }
 
     function getLine(firstPoint, secondPoint) {
-        const slope = (firstPoint.col - secondPoint.col) !== 0 ? -(firstPoint.row - secondPoint.row) / (firstPoint.col - secondPoint.col) : Number.MAX_SAFE_INTEGER
+        if (firstPoint == null || secondPoint == null) return []
+        const {row: row1, col: col1} = firstPoint;
+        const {row: row2, col: col2} = secondPoint;
         const intersections = []
 
-        const possibleArea = Area.corners(firstPoint, secondPoint)
-        console.log(possibleArea);
-        console.log(slope);
+        if (firstPoint.col - secondPoint.col == 0) {
+            for (let row = Math.min(row1, row2); row <= Math.max(row1, row2); row++) {
+                intersections.push(new Selection(Math.floor(row), Math.floor(col1)))
+            }
+        } else {
+            const slope = (firstPoint.row - secondPoint.row) / (firstPoint.col - secondPoint.col)
+            const yIntercept = row1 - (slope * col1);
+            console.log('y-intercept: ', yIntercept)
 
-        alterData('selections', removeDuplicates(selections.concat(intersections)))
+            const changeInX = (Math.max(col1, col2) - Math.min(col1, col2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
+            
+            for (let col = Math.min(col1, col2); col <= Math.max(col1, col2); col += changeInX) {
+                const row = (slope * col) + yIntercept;
+                intersections.push(new Selection(Math.floor(row), Math.floor(col)));
+            }
+        }   
+        
+        return removeDuplicates(intersections)
     }
+    const drawLine = (firstPoint, secondPoint) => alterData("selections", selections.concat(getLine(firstPoint, secondPoint)))
+
+    function getBox(firstPoint, secondPoint) {
+        if (firstPoint == null || secondPoint == null) return []
+        const {row: row1, col: col1} = firstPoint;
+        const {row: row2, col: col2} = secondPoint;
+        return [].concat(
+            getLine(new Selection(Math.min(row1, row2), Math.min(col1, col2)), new Selection(Math.min(row1, row2), Math.max(col1, col2))),
+            getLine(new Selection(Math.min(row1, row2), Math.min(col1, col2)), new Selection(Math.max(row1, row2), Math.min(col1, col2))),
+            getLine(new Selection(Math.max(row1, row2), Math.max(col1, col2)), new Selection(Math.min(row1, row2), Math.max(col1, col2))),
+            getLine(new Selection(Math.max(row1, row2), Math.max(col1, col2)), new Selection(Math.max(row1, row2), Math.min(col1, col2))),
+        )
+    }
+    const drawBox = (firstPoint, secondPoint) => alterData("selections", selections.concat(getBox(firstPoint, secondPoint)))
+
+    function getEllipse(firstPoint, secondPoint) {
+        if (firstPoint == null || secondPoint == null) return []
+        const {row: row1, col: col1} = firstPoint;
+        const {row: row2, col: col2} = secondPoint;
+        const centerCol = (col1 + col2) / 2
+        const centerRow = (row1 + row2 ) / 2
+        const horizontalRadius = Math.abs(col1 - col2) / 2;
+        const verticalRadius = Math.abs(row1 - row2) / 2;
+        const intersections = []
+
+        if (firstPoint.col == secondPoint.col || firstPoint.row == secondPoint.row) {
+            return getLine(firstPoint, secondPoint)
+        }
+
+        const changeInX = (Math.abs(col1 - col2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
+        const changeInY = (Math.abs(row1 - row2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
+        for (let col = Math.min(firstPoint.col, secondPoint.col); col <= Math.max(firstPoint.col, secondPoint.col); col += changeInX) {
+            const evaluation = Math.sqrt(Math.pow(verticalRadius, 2) * (1  - (Math.pow(col - centerCol, 2) / Math.pow(horizontalRadius, 2) ) ))
+            intersections.push(new Selection(Math.floor(centerRow + evaluation), Math.floor(col)));
+            intersections.push(new Selection(Math.floor(centerRow - evaluation), Math.floor(col)));
+        } 
+
+        for (let row = Math.min(firstPoint.row, secondPoint.row); row <= Math.max(firstPoint.row, secondPoint.row); row += changeInY) {
+            const evaluation = Math.sqrt(Math.pow(horizontalRadius, 2) * (1  - (Math.pow(row - centerRow, 2) / Math.pow(verticalRadius, 2) ) ))
+            intersections.push(new Selection(Math.floor(row), Math.floor(centerCol + evaluation)));
+            intersections.push(new Selection(Math.floor(row), Math.floor(centerCol - evaluation)));
+        } 
+        
+        return removeDuplicates(intersections)
+    }
+    const drawEllipse = (firstPoint, secondPoint) => alterData("selections", selections.concat(getEllipse(firstPoint, secondPoint)))
+
 
     const lastMousePosition = useRef({x: 0, y: 0})
 
@@ -225,7 +320,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
                 row: view.coordinates.row + ( changeInVerticalCellSpan / 2 ),
                 col: view.coordinates.col + ( changeInHorizontalCellSpan / 2)
             },
-            zoom: view.zoom + zoomOffset
+            zoom: Math.max(MIN_ZOOM, view.zoom + zoomOffset)
         })
         // alterData('view.coordinates', {row: centerCell.row - (canvas.height / newCellSize / 2), col: view.coordinates.col - (canvas.width / newCellSize / 2)})
     }
@@ -374,27 +469,49 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
         const currentBox = (row, col) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize, cellSize]
         context.globalAlpha = 0.5
         
-        pattern.forEach(cell => {
+        switch (brush.type) {
+            case "pixel": context.fillRect(...currentBox(hoveredCell.row, hoveredCell.col)); break;
+            case "pattern": pattern.forEach(cell => {
             context.fillRect(...currentBox(cell.row + hoveredCell.row, cell.col + hoveredCell.col))
-        })
-
+                }); break;
+            case "line": getLine(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
+            case "box": getBox(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
+            case "ellipse": getEllipse(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
+            default: context.fillRect(...currentBox(hoveredCell.row, hoveredCell.col)); break;
+        }
+        
+        
         context.globalAlpha = 1;
     }
-
-//  If the cell is alive, then it stays alive if it has either 2 or 3 live neighbors
-
-    function getNeighbors(selection) {
-        const neighbors = []
-        const {row: centerRow, col: centerCol} = selection
-        for (let row = centerRow - 1; row <= centerRow + 1; row++) {
-            for (let col = centerCol - 1; col <= centerCol + 1; col++) {
-                if (!(row === centerRow && col === centerCol)) {
-                    neighbors.push(new Selection(row, col))
-                }
-            }
+    
+    const fitGap = 5
+    function screenFit() {
+        if (isEmpty()) return
+    
+        const sortedHorizontally = selections.sort((first, second) => first.col - second.col)
+        const sortedVertically = selections.sort((first, second) => first.row - second.row)
+        const cellHorizontalSpan = Math.abs(sortedHorizontally?.[0].col - sortedHorizontally?.[sortedHorizontally.length - 1].col);
+        const cellVerticalSpan = Math.abs(sortedVertically?.[0].row - sortedVertically?.[sortedVertically.length - 1].row);
+    
+        const desiredCellSize = Math.min(getCanvasBounds().width, getCanvasBounds().height) / Math.max(cellHorizontalSpan, cellVerticalSpan) - fitGap
+        console.log('desired cell size: ', desiredCellSize)
+    
+        const newZoom = Math.max(MIN_ZOOM, Math.min(2, getZoomfromCellSize(desiredCellSize)))
+        console.log("new zoom: ", newZoom)
+    
+        const medianPosition = {
+            row: selections[Math.floor(selections.length / 2)].row,
+            col: selections[Math.floor(selections.length / 2)].col
         }
-        return neighbors
+    
+        alterData('view', {...boardData.view, coordinates: {
+            row: medianPosition.row - getCellsVerticallyAcrossScreen() / 2,
+            col: medianPosition.col - getCellsHorizontallyAcrossScreen() / 2
+            },
+            zoom: newZoom
+        })
     }
+//  If the cell is alive, then it stays alive if it has either 2 or 3 live neighbors
 
     function getAdjacentNeighbors(selection) {
         const {row: centerRow, col: centerCol} = selection
@@ -405,37 +522,25 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
             new Selection(centerRow, centerCol + 1)
         ]
     }
-
-    const fitGap = 5
-    function screenFit() {
-        if (isEmpty()) return
-
-        const sortedHorizontally = selections.sort((first, second) => first.col - second.col)
-        const sortedVertically = selections.sort((first, second) => first.row - second.row)
-        const cellHorizontalSpan = Math.abs(sortedHorizontally?.[0].col - sortedHorizontally?.[sortedHorizontally.length - 1].col);
-        const cellVerticalSpan = Math.abs(sortedVertically?.[0].row - sortedVertically?.[sortedVertically.length - 1].row);
-
-        const desiredCellSize = Math.min(getCanvasBounds().width, getCanvasBounds().height) / Math.max(cellHorizontalSpan, cellVerticalSpan) - fitGap
-        console.log('desired cell size: ', desiredCellSize)
-
-        const newZoom = Math.max(0.10, Math.min(2, getZoomfromCellSize(desiredCellSize)))
-        console.log("new zoom: ", newZoom)
-
-        const medianPosition = {
-            row: selections[Math.floor(selections.length / 2)].row,
-            col: selections[Math.floor(selections.length / 2)].col
-        }
-
-        alterData('view', {...boardData.view, coordinates: {
-            row: medianPosition.row - getCellsVerticallyAcrossScreen() / 2,
-            col: medianPosition.col - getCellsHorizontallyAcrossScreen() / 2
-            },
-            zoom: newZoom
-        })
+    
+    function getNeighbors(selection) {
+        const {row, col} = selection;
+        return getAdjacentNeighbors(selection).concat([
+            new Selection(row + 1, col + 1),
+            new Selection(row - 1, col + 1),
+            new Selection(row + 1, col - 1),
+            new Selection(row - 1, col - 1)
+        ])
     }
 
+
+
+    // function getLiveNeighbors(selection) {
+    //     return getNeighbors(selection).filter(sel => isSelected(sel))
+    // }
+
     function getLiveNeighbors(selection) {
-        return getNeighbors(selection).filter(sel => isSelected(sel))
+        return selections.filter(cell => Math.abs(cell.row - selection.row) <= 1 && Math.abs(cell.col - selection.col) <= 1 && !(cell.row == selection.row && cell.col == selection.col))
     }
 
     function getAreasToCheck() {
@@ -443,8 +548,8 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
     }
 
     function tick() {
-        const centerOfView = getViewArea().center;
-        const testCells = getAreasToCheck().map(cell => new Selection(cell.row, cell.col)).filter(cell => cell.distanceFrom(centerOfView) < MAX_CELL_WANDER_DISTANCE);
+        // const centerOfView = getViewArea().center;
+        const testCells = getAreasToCheck().map(cell => new Selection(cell.row, cell.col));
         const nextGenFilter = cell => {
             const numOfLiveNeighbors = getLiveNeighbors(cell).length
             if (isSelected(cell)) {
@@ -457,21 +562,23 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
         const living = testCells.filter(nextGenFilter)
         lastTick.current = Date.now()
         lastGeneration.current = cloneSelections(selections)
+        
+        if (boardData.playback.enabled && !isPending) {
+            alterData("selections", living )
+            alterData("playback.currentGeneration", boardData.playback.currentGeneration + 1)
+        }
 
-        alterData("playback.currentGeneration", boardData.playback.currentGeneration + 1)
-        alterData("selections", living )
         if (boardData.settings.isScreenFit && !allCellsInView())
             screenFit()
-    }
+    }   
 
 
     const observer = useRef(new ResizeObserver(() => {resizeCanvas(); draw()}));
     useEffect(() => {
         observer.current.disconnect()
-        resizeCanvas()
         draw()
         observer.current = new ResizeObserver(() => {resizeCanvas(); draw()})
-        observer.current.observe(canvasRef.current)
+        observer.current.observe(document.documentElement)
 
         if (!canvasRef.current) return
         showDisplayBackToCenter(!anyCellsInView())
@@ -479,18 +586,19 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
 
     
     const frameRequested = useRef(false);
+    const selectionsBeforeAnimation = useRef([])
     useEffect(() => { 
         animationStartTime.current = Date.now() 
-        console.log("started animating");
+        // console.log("useEffect animation playback");
         
         if (boardData.playback.enabled) {
-            const selections = removeDuplicates(boardData.selections)
-            alterData('selectionsBeforeAnimation', cloneSelections(selections))
-            alterData('selections', selections)
+            selectionsBeforeAnimation.current = removeDuplicates(cloneSelections(boardData.selections))
+            alterData('selections', removeDuplicates(cloneSelections(boardData.selections)))
         } else {
+            console.log("Reverting back to before animation, ", selectionsBeforeAnimation.current)
             lastGeneration.current = []
             frameRequested.current = false;
-            alterData('selections', boardData.selectionsBeforeAnimation)
+            startTransition(() => alterData("selections", selectionsBeforeAnimation.current))
             alterData('playback.currentGeneration', 0)
         }
         
@@ -515,6 +623,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
             frameRequested.current = true;
             getNextTick()
         }
+
     }, [boardData.selections])
 
     const keyEvents = [
@@ -541,6 +650,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
         new KeyBinding({key: 'c', onControl: true, onDown: copy}),
         new KeyBinding({key: 'v', onControl: true, onDown: paste}),
         new KeyBinding({key: 's', onControl: true, onDown: paste}),
+        new KeyBinding({key: " ", onDown: () => console.log(selectionsBeforeAnimation.current)})
         // new KeyBinding({key: 'BackSpace', onDown: })
     ]
 
@@ -551,17 +661,17 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
 
         const center = new Selection(Math.round(selectedArea.row + selectedArea.height / 2), Math.round(selectedArea.col + selectedArea.width / 2))
         const copied = selections.filter(cell => selectedArea.containsArea(cell)).map(cell => new Selection(cell.row - center.row, cell.col - center.col))
-        localStorage.setItem(`Copy Data: Board ID #${boardData.id}`, JSON.stringify(copied));
+        localStorage.setItem(`Copy Data`, JSON.stringify(copied));
     }
 
     function paste() {
         console.log('paste');
-        if (localStorage.getItem(`Copy Data: Board ID #${boardData.id}`) == null) return
+        if (localStorage.getItem(`Copy Data`) == null) return
         if (boardData.playback.enabled) return
 
         
         const focusCell = lastHoveredCell.current;
-        const toPaste = JSON.parse(localStorage.getItem(`Copy Data: Board ID #${boardData.id}`)
+        const toPaste = JSON.parse(localStorage.getItem(`Copy Data`)
         ).map(cell => new Selection(cell.row + focusCell.row, cell.col + focusCell.col));
         alterData('selections', selections.concat(...toPaste));
     }
@@ -595,30 +705,41 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
         //     moveSelectedArea(mouseEvent); return;
         // }
 
-
-
         if (clickedSelectedArea(mouseEvent) && mouseEvent.button == 2) {
             setSelectedArea(new Area(0, 0, 0, 0));
         }
 
+
         
-        if (!boardData.playback.enabled) {
-            select(getHoveredCell(mouseEvent))
+        if (!boardData.playback.enabled && editable) {
+            
             switch(brush.type) {
+                case 'pixel': select(getHoveredCell(mouseEvent)); break;
                 case 'fill': fill(getHoveredCell(mouseEvent)); break;
+                case 'box':
+                case 'ellipse':
                 case 'line': setBrush({...brush, extra: {...brush.extra, lineStart: getHoveredCell(mouseEvent)}}); break;
             }
         }
     }
 
     function mouseMoveListener(mouseEvent) {
-        if (!boardData.playback.enabled) {
+        if (!boardData.playback.enabled && (brush.type == 'pixel' || brush.type == 'pattern')) {
             DragBrush(mouseEvent); 
         }
 
+        const hoveredCell = getHoveredCell(mouseEvent)
+        if (selectedArea.containsArea(hoveredCell)) {
+            setCanvasTooltip("Ctrl C to copy")
+        } else {
+            if (canvasTooltip !== "")
+                setCanvasTooltip("")
+        }
+
+
+        drawMouseShadow(mouseEvent); 
         mousePan(mouseEvent); 
         mouseZoom(mouseEvent); 
-        drawMouseShadow(mouseEvent); 
         selectingArea(mouseEvent);
         moveSelectedArea(mouseEvent);
     }
@@ -634,16 +755,19 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
     const onContextMenu = (event) => {
         event.preventDefault();
 
-
-
         onInputStop();
     }
     
     const onMouseUp = (event) => {
         console.log("MOUSE UP");
-        if (brush.type == 'line') {
-            getLine(brush.extra.lineStart, getHoveredCell(event))
+        if (boardData.editMode == 'draw') {
+            switch (brush.type) {
+                case "line": drawLine(brush.extra.lineStart, getHoveredCell(event)); break;
+                case "box": drawBox(brush.extra.lineStart, getHoveredCell(event)); break;
+                case "ellipse": drawEllipse(brush.extra.lineStart, getHoveredCell(event)); break;
+            }
         }
+        brush.extra.lineStart = undefined;
         onInputStop(event);
     }
 
@@ -679,8 +803,8 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
     }
 
   return (
-    <div className='game-board'>
-        <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onContextMenu} onMouseEnter={onMouseEnter} onMouseLeave={onInputStop} onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} tabIndex={0} style={{cursor: cursor}}/>
+    <div className='game-board' ref={boardRef}>
+            <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onContextMenu} onMouseEnter={onMouseEnter} onMouseLeave={onInputStop} onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} tabIndex={0} style={{cursor: cursor}}/>
         { boardData.playback.enabled && <div className='animating-ui'>
                 <h3 className='generation-display'> Current Generation: { boardData.playback.currentGeneration } </h3>
                 <div className='flex-column'>
@@ -692,7 +816,9 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
              </div> }
             
         { displayBackToCenter && <button className='flex-row back-to-center-button' onClick={centerCamera}> <AiFillCloseCircle /> <span> Back <br/> To <br/> Center <br /> </span> </button> }
-
+        
+        { canvasTooltip !== "" && <ToolTip> { canvasTooltip } </ToolTip>}
+        
         <div className='game-toolbar flex-row'>
             
             <div className="drawing-options" onMouseLeave={() => setShowingDrawingOptions(false)}>
@@ -703,6 +829,8 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
                     <div className="flex-column"> 
                         <button onClick={() => setBrush({...brush, type: 'pixel'})} className={`game-tool ${brush.type == 'pixel' ? 'selected' : 'unselected'}`}> Pixel <ToolTip> Default Pixel Tool </ToolTip> </button>
                         <button onClick={() => setBrush({...brush, type: 'line'})} className={`game-tool ${brush.type == 'line' ? 'selected' : 'unselected'}`}> Line <ToolTip> Line Tool </ToolTip> </button>
+                        <button onClick={() => setBrush({...brush, type: 'box'})} className={`game-tool ${brush.type == 'box' ? 'selected' : 'unselected'}`}> Box <ToolTip> Box Tool </ToolTip> </button>
+                        <button onClick={() => setBrush({...brush, type: 'ellipse'})} className={`game-tool ${brush.type == 'ellipse' ? 'selected' : 'unselected'}`}> Ellipse <ToolTip> Ellipse Tool </ToolTip> </button>
                         <button onClick={() => setBrush({...brush, type: 'fill'})} className={`game-tool ${brush.type == 'fill' ? 'selected' : 'unselected'}`}> Fill <ToolTip> Fill Tool </ToolTip> </button>
                         <button onClick={() => setBrush({...brush, type: 'pattern'})} className={`game-tool ${brush.type == 'pattern' ? 'selected' : 'unselected'}`}> Pattern <ToolTip> Pattern Tool </ToolTip> </button>
                     </div>
@@ -720,7 +848,8 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
             <button onClick={() => editMode != 'select' ? alterData('editMode', 'select') : ''} className={`game-tool ${boardData.editMode == 'select' ? 'selected' : 'unselected'}`}> <BsBoundingBox /> <ToolTip> 5 (Alt + Drag): Select </ToolTip> </button>
             <button onClick={() => alterData( "playback.enabled", !boardData.playback.enabled )} className={`game-tool ${boardData.playback.enabled ? "selected" : 'unselected'}`}> <FaPlay /> <ToolTip> Enter: Play </ToolTip> </button>
             {/* <button> <FaBackspace /> </button> */}
-            <button onClick={clear} className={`game-tool`}> <FaRegTrashAlt /> <ToolTip> Delete: Clear </ToolTip> </button> 
+            <button onClick={clear} className={`game-tool`}> <FaRegTrashAlt /> <ToolTip> C: Clear </ToolTip> </button> 
+            <button onClick={undo} className={`game-tool`}> <FaUndo /> <ToolTip> Ctrl + Z: Undo </ToolTip> </button> 
 
             <div className='flex-column'>
                 <button onClick={() => setShowBoardDataDisplay(!showBoardDataDisplay)} className={`game-tool ${showBoardDataDisplay ? 'selected' : 'unselected'}`}> <FaChevronCircleDown />  <ToolTip> Board Data </ToolTip> </button>
@@ -737,7 +866,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch } ) => {
                     <input type="range" id='zoom-input' min="0.05" max='3' step="0.05" value={view.zoom} onChange={(event) => alterData('view.zoom', Number(event.target.value)) }/>
                 </div> } 
         </div>
-            <button onClick={() => removeCallback?.()} className={`game-tool`}> <AiFillCloseCircle /> <ToolTip> Esc: Exit </ToolTip> </button> 
+            <button onClick={() => removeCallback?.()} className={`game-tool`}> <FaWindowClose /> <ToolTip> Esc: Exit </ToolTip> </button> 
         </div>
     </div>
   )

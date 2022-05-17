@@ -1,4 +1,5 @@
 import { cloneDeep } from 'lodash'
+import { average } from './functions'
 export class Selection {
     constructor(row, col, type = 'cell') {
       this.row = row
@@ -6,9 +7,18 @@ export class Selection {
       this.type = type
     }
 
-    distanceFrom(selection) {
-      return Math.sqrt( Math.pow(( this.col - selection.col), 2) + Math.pow(( this.row - selection.row ), 2) )
+    static distanceBetween(first, second) {
+      return Math.sqrt( Math.pow(( first.col - second.col), 2) + Math.pow(( first.row - second.row ), 2) )
     } 
+
+    static clone(selection) {
+      const {row, col, type} = selection
+      return new Selection(row, col, type)
+    }
+
+    toString() {
+      return `${this.row}R${this.col}C${this.type}T`
+    }
   }
   
   export class Area {
@@ -17,6 +27,7 @@ export class Selection {
         this.col = col;
         this.width = width;
         this.height = height
+        this.selected = []
     }
     
     get rightSide() {
@@ -106,26 +117,11 @@ export class Selection {
     }
   }
 
-let patternCount = 0;
-export class Pattern {
-  constructor(data) {
-    if (data instanceof Pattern) {
-      const clonedData = cloneDeep(data)
-      Object.keys(clonedData).forEach(prop => this[prop] = clonedData[prop])
-    }
-
-    this.name = data?.name ? data.name : `pattern ${++patternCount}`
-    this.cells = data?.cells ? data.cells : [];
-  }
-}
 
 let boardIDs = 0;
 export class BoardData {
     constructor(previousData) {
-      if (previousData) {
-        const clonedData = cloneDeep(previousData)
-        Object.keys(clonedData).forEach(prop => this[prop] = clonedData[prop])
-      }
+      
       this.id = ++boardIDs;
   
       this.selections = []
@@ -159,6 +155,10 @@ export class BoardData {
       }
   
       this.editMode = 'draw'
+      if (previousData) {
+        const clonedData = cloneDeep(previousData)
+        Object.keys(clonedData).forEach(prop => this[prop] = clonedData[prop])
+      }
     }
 
     pushHistory() {
@@ -190,5 +190,40 @@ export class BoardData {
       lastBoard.history = this.history;
       console.log('last board', lastBoard)
       return lastBoard;
+    }
+
+    toPattern() {
+      return new Pattern(this.selections)
+    }
+  }
+
+  let patternCount = 0;
+  const getPatternID = () => `Pattern #${patternCount++}`
+  export class Pattern {
+    constructor({ selections = [], name = getPatternID(), creator = "Jacoby", description = " A Pattern ", dateCreated = new Date(), lastModified = new Date() }) {
+      this.name = name;
+      this.id = name.startsWith("Pattern #") ? name : getPatternID()
+      this.creator = creator;
+      this.description = description;
+      this.dateCreated = dateCreated
+      this.lastModified = lastModified
+
+
+      if (selections.length == 0) {
+        this.selections = selections;
+        return
+      }
+      const centerOfSelections = new Selection(average(selections.map(sel => sel.row)), average(selections.map(sel => sel.col)))
+      this.selections = selections.map(sel => new Selection(sel.row - centerOfSelections.row, sel.col - centerOfSelections.col))
+    }
+
+    get count() {
+      return this.selections.length;
+    }
+  }
+
+  class User {
+    constructor(id) {
+      
     }
   }

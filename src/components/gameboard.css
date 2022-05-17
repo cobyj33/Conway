@@ -4,6 +4,11 @@
     flex-shrink: 1;
     position: relative;
     border: 1px solid #000000;
+
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     /* min-width: 25vw; */
   }
   
@@ -11,6 +16,8 @@
     position: relative;
     width: 100%;
     height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     background-color: #666;
   }
   
@@ -24,6 +31,11 @@
     flex-direction: row;
     justify-content: center;
     align-items: center;
+  }
+
+  #speed-slider {
+    max-width: 100px;
+    width: 100px;
   }
 
   .game-display-information {

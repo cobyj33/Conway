@@ -7,134 +7,88 @@ import { BoardData, Pattern } from './classes'
 import { cloneDeep } from 'lodash'
 import { PatternMenu } from './components/PatternMenu'
 import { Alert } from './components/Alert'
+import { nextLargestPerfectSquare, boardReducer } from './functions'
+import icon from "./assets/Conway Logo.png"
+const patterns = require("./assets/patterns.json")
+.map(patternData => new Pattern(patternData))
 
-const GlobalState = createContext(null)
 const nextID = 0;
 
 //request: {accessor = "", newValue}
 
 
-function boardReducer(state, action) {
-  const {type, id, request} = action;
-  const chosenBoard = state.filter(board => board.id === id)?.[0];
-  const newBoard = cloneDeep(chosenBoard);
-  switch (type) {
-    case "remove":
-      if (!id) {
-        console.log("cannot remove a board with no id");
-        return state;
-      }
-
-      return state.filter(board => board.id !== id)
-    case "add":
-      return state.concat(new BoardData())
-    case "alter":
-      if (!chosenBoard) return state
-        const {accessor = "", newValue} = request
-        const keys = accessor.split('.')
-        if (keys.length == 0 || !("newValue" in request) || !chosenBoard) return state
-    
-        
-        let currentProperty = newBoard
-        while (keys.length > 1) {
-            const key = keys.shift()
-            if (`${key}` in currentProperty) {
-                currentProperty = currentProperty[key] 
-            } else {
-                console.log("key ", key, " does not exist in board ", newBoard.id)
-                return state;
-            }
-        }
-
-        
-        const finalKey = keys.pop()
-        console.log('final key: ', finalKey)
-    
-        if (`${finalKey}` in currentProperty) {
-            currentProperty[finalKey] = newValue
-        } else {
-            console.log("key ", finalKey, " does not exist in ", chosenBoard)
-              return state;
-        }
-      return state.filter(board => board.id !== id).concat(newBoard).sort((first, second) => first.id - second.id)
-      case "set state":
-        if (!id) {
-          console.log("no valid id");
-          return state;
-        }
-
-        const { newState } = action;
-        return state.filter(board => board.id !== id).concat(newState);
-    default:
-      console.log("No valid selected dispatch type: ", type)
-      return state
-    }
-}
 
 
-const themeContext = createContext();
-const patternContext = createContext();
-const boardContext = createContext();
+export const ThemeContext = createContext();
+export const PatternContext = createContext();
+export const BoardContext = createContext();
 export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
     const [showingPatternMenu, setShowingPatternMenu] = useState(false);
     const [boardDatas, boardDatasDispatch] = useReducer(boardReducer, [new BoardData()])
-    const [savedPatterns, setSavedPatterns] = useState([]);
+    const [savedPatterns, setSavedPatterns] = useState(patterns);
     const [theme, setTheme] = useState('')
 
-    const globalState = {
-        theme: theme
+    const numOfCols = Math.ceil(Math.sqrt(boardDatas.length))
+    const numOfRows = (numOfCols - 1) + (boardDatas.length > nextLargestPerfectSquare(boardDatas.length) - Math.sqrt(nextLargestPerfectSquare(boardDatas.length)))
+
+    const boardGrid = {
+      gridTemplateColumns: `repeat(${numOfCols}, minmax(0, 1fr))`,
+      gridTemplateRows: `repeat(${numOfRows}, minmax(0, 1fr))`
     }
-    
 
 
   return (
-      <GlobalState.Provider value={globalState}>
+      <ThemeContext.Provider value={[theme, setTheme]}>
+        <BoardContext.Provider value={[boardDatas, boardDatasDispatch]} >
+          <PatternContext.Provider value={[savedPatterns, setSavedPatterns]} >
+            <div className='game-area' style={boardGrid}> 
+            {/* <Alert> This is a test </Alert> */}
+              { boardDatas.map(data => 
+              <GameBoard key={`Board ID ${data.id}`}
+              boardData={data}
+              boardDatasDispatch={boardDatasDispatch}
+              />)}
+            </div>
 
-      <div className='game-area'> 
-      {/* <Alert> This is a test </Alert> */}
-        { boardDatas.map(data => 
-        <GameBoard key={`Board ID ${data.id}`}
-        boardData={data}
-        boardDatasDispatch={boardDatasDispatch}
-        />)}
-      </div>
+            <Sidebar>
+              <img src={icon} width="190px" height="90px" style={{width: "190px", height: "90px", display: 'inline-block'}} />
+                <div> Conway's Game Of Life <br /> Made By: Jacoby Johnson </div>
+                {/* <button className={`examples-button ${examplesMenu ? 'opened' : ''}`} onClick={() => setExamplesMenu(!examplesMenu)}> Examples </button>
+                { examplesMenu && <div className='examples'>
+                Examples
+                  </div> }
 
-        <Sidebar>
-            <div> Conway's Game Of Life <br /> Made By: Jacoby Johnson </div>
-            {/* <button className={`examples-button ${examplesMenu ? 'opened' : ''}`} onClick={() => setExamplesMenu(!examplesMenu)}> Examples </button>
-            { examplesMenu && <div className='examples'>
-              Examples
-              </div> }
+                  <button className={`settings-button ${settingsMenu ? 'opened' : ''}`} onClick={() => setSettingsMenu(!settingsMenu)}> Settings </button>
+                { settingsMenu && <div className='settings'>
+                    <div className="flex-column">
+                        <button onClick={() => theme != 'dark' ? setTheme('dark') : setTheme('')} className={theme == 'dark' ? 'on' : ''}> <FaMoon /> Dark Mode <FaMoon /> </button>
+                        </div>
 
-            <button className={`settings-button ${settingsMenu ? 'opened' : ''}`} onClick={() => setSettingsMenu(!settingsMenu)}> Settings </button>
-            { settingsMenu && <div className='settings'>
-                <div className="flex-column">
-                    <button onClick={() => theme != 'dark' ? setTheme('dark') : setTheme('')} className={theme == 'dark' ? 'on' : ''}> <FaMoon /> Dark Mode <FaMoon /> </button>
-                </div>
+                  </div>} */}
 
-              </div>} */}
+                <button className={`add-board-button`} onClick={() => boardDatasDispatch({type: 'add'})}> Add Board </button>
+                {/* <button className={`pattern-button ${showingPatternMenu ? 'opened' : ''}`} onClick={() => setShowingPatternMenu(!showingPatternMenu)}> Pattern Menu </button> */}
 
-            <button className={`add-board-button`} onClick={() => boardDatasDispatch({type: 'add'})}> Add Board </button>
-            <button className={`pattern-button ${showingPatternMenu ? 'opened' : ''}`} onClick={() => setShowingPatternMenu(!showingPatternMenu)}> Pattern Menu </button>
+                <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
+                { aboutMenu && <div className='about'>
+                    Rules: <br/><br/>
+                    Any live cell with two or three live neighbors survives. <br/><br/>
 
-            <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
-            { aboutMenu && <div className='about'>
-                Rules: <br/><br/>
-                Any live cell with two or three live neighbors survives. <br/><br/>
+                    Any dead cell with three live neighbors becomes a live cell.<br/><br/>
 
-                Any dead cell with three live neighbors becomes a live cell.<br/><br/>
+                    Be Creative!
+                  </div>}
 
-                Be Creative!
-              </div>}
+                <a href="https://www.github.com/cobyj33/Conway" target="_blank"> <button> Project Link </button> </a>
+                <a href="https://www.github.com/cobyj33/" target="_blank"> <button> Other Creations </button> </a>
+            </Sidebar>
 
-            <a href="https://www.github.com/cobyj33/Conway" target="_blank"> <button> Project Link </button> </a>
-            <a href="https://www.github.com/cobyj33/" target="_blank"> <button> Other Creations </button> </a>
-        </Sidebar>
-
-        { showingPatternMenu && <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setShowingPatternMenu(false)}/>}
-      </GlobalState.Provider>
+            { showingPatternMenu && <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setShowingPatternMenu(false)}/>}
+          </PatternContext.Provider>
+        </BoardContext.Provider>
+      </ThemeContext.Provider>
   )
 }
 

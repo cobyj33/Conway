@@ -1,5 +1,8 @@
 html, body {
-  overflow: hidden;
+  /* overflow: hidden; */
+  width: 100%;
+  height: 100%;
+  margin: 0;
 }
 
 /* .front-layer {
@@ -23,15 +26,27 @@ html, body, body > div {
   user-select: none;
 }
 
+button {
+  border: none;
+  background: none;
+  color: white;
+}
+
 .game-area {
   position: relative;
   left: 5%;
   width: 95%;
   height: 100%;
 
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  /* justify-content: stretch;
+  align-content: stretch; */
+
+  /* display: flex;
   flex-direction: row;
-  justify-content: center;
+  flex-wrap: wrap; */
   /* flex-wrap: wrap; */
 }
 
