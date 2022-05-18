@@ -22,11 +22,13 @@ const nextID = 0;
 export const ThemeContext = createContext();
 export const PatternContext = createContext();
 export const BoardContext = createContext();
+export const RenderContext = createContext();
 export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
     const [showingPatternMenu, setShowingPatternMenu] = useState(false);
     const [boardDatas, boardDatasDispatch] = useReducer(boardReducer, [new BoardData()])
+    const renders = useRef([]);
     const [savedPatterns, setSavedPatterns] = useState(patterns);
     const [theme, setTheme] = useState('')
 
@@ -43,17 +45,20 @@ export const App = () => {
       <ThemeContext.Provider value={[theme, setTheme]}>
         <BoardContext.Provider value={[boardDatas, boardDatasDispatch]} >
           <PatternContext.Provider value={[savedPatterns, setSavedPatterns]} >
-            <div className='game-area' style={boardGrid}> 
-            {/* <Alert> This is a test </Alert> */}
-              { boardDatas.map(data => 
-              <GameBoard key={`Board ID ${data.id}`}
-              boardData={data}
-              boardDatasDispatch={boardDatasDispatch}
-              />)}
-            </div>
+            
+            <RenderContext.Provider value={renders}>
+              <div className='game-area' style={boardGrid}> 
+              {/* <Alert> This is a test </Alert> */}
+                { boardDatas.map(data => 
+                <GameBoard key={`Board ID ${data.id}`}
+                boardData={data}
+                boardDatasDispatch={boardDatasDispatch}
+                />)}
+              </div>
+            </RenderContext.Provider>
 
             <Sidebar>
-              <img src={icon} width="190px" height="90px" style={{width: "190px", height: "90px", display: 'inline-block'}} />
+                <img src={icon} style={{width: "80%", aspectRatio: "2175 / 1025", display: 'inline-block'}} />
                 <div> Conway's Game Of Life <br /> Made By: Jacoby Johnson </div>
                 {/* <button className={`examples-button ${examplesMenu ? 'opened' : ''}`} onClick={() => setExamplesMenu(!examplesMenu)}> Examples </button>
                 { examplesMenu && <div className='examples'>

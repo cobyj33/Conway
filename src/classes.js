@@ -17,7 +17,12 @@ export class Selection {
     }
 
     toString() {
-      return `${this.row}R${this.col}C${this.type}T`
+      return JSON.stringify(this)
+    }
+
+    static StringToSelection(string) {
+      const {row, col, type} = JSON.parse(string);
+      return new Selection(Number(row), Number(col), type);
     }
   }
   
@@ -126,7 +131,6 @@ export class BoardData {
   
       this.selections = []
       this.walls = []
-      this.selectionsBeforeAnimation = []
       this.pattern = [{row: 0, col: 0}];
       this.playback = {
         enabled: false,
@@ -222,6 +226,12 @@ export class BoardData {
     }
   }
 
+  export class Render {
+    constructor(startingSelections, renders = {}) {
+      this.renders = renders
+      this.startingSelections = startingSelections.map(sel => Selection.clone(sel))
+    }
+  } 
   class User {
     constructor(id) {
       

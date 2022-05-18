@@ -1,6 +1,73 @@
-import { cloneDeep } from "lodash";
-import { BoardData, Selection } from "./classes";
+import { cloneDeep, remove } from "lodash";
+import { BoardData, Render, Selection } from "./classes.js";
 
+  export function getAdjacentNeighbors(selection) {
+    const {row: centerRow, col: centerCol} = selection
+    return [
+        new Selection(centerRow - 1, centerCol),
+        new Selection(centerRow + 1, centerCol),
+        new Selection(centerRow, centerCol - 1),
+        new Selection(centerRow, centerCol + 1)
+    ]
+  }
+
+  export function getNeighbors(selection) {
+    const {row, col} = selection;
+    return getAdjacentNeighbors(selection).concat([
+        new Selection(row + 1, col + 1),
+        new Selection(row - 1, col + 1),
+        new Selection(row + 1, col - 1),
+        new Selection(row - 1, col - 1)
+    ])
+  } 
+
+  export function removeDuplicates(selectionList) {
+    const tracker = new Set([])
+
+    return selectionList.filter(cell => {
+        const cellString = cell.toString();
+        if (tracker.has(cellString)) {
+            return false;
+        } else {
+            tracker.add(cellString)
+            return true
+        }
+    })
+  }
+
+  export function getLiveNeighbors(selection, living) {
+    return getNeighbors(selection).filter(neighbor => living.has(neighbor.toString()) )
+  }
+
+  export function getAreasToCheck(selections) {
+    console.log(selections)
+      return removeDuplicates(selections.flatMap(sel => [...getNeighbors(sel), Selection.clone(sel)]))
+  }
+
+  export function getRender(selections, generations) {
+    const renders = {}
+    let currentGeneration = selections.map(sel => Selection.clone(sel))
+    for (let i = 0; i < generations; i++) {
+      renders[i] = currentGeneration;
+      currentGeneration = getNextGeneration(currentGeneration, new Set(currentGeneration.map(cell => cell.toString())))
+    }
+
+    return new Render(selections.map(sel => Selection.clone(sel)), renders)
+  } 
+
+  export function getNextGeneration(selections, selectionSet) {
+    const testCells = getAreasToCheck(selections);
+    const nextGenFilter = cell => {
+        const numOfLiveNeighbors = getLiveNeighbors(cell, selectionSet).length
+        if (selectionSet.has(cell.toString())) {
+            return numOfLiveNeighbors === 2 || numOfLiveNeighbors === 3 
+        } 
+
+        return numOfLiveNeighbors === 3
+    }
+
+    return testCells.filter(nextGenFilter)
+  }   
 
 
 export function nextLargestPerfectSquare(num) {
