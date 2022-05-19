@@ -159,9 +159,14 @@ export class BoardData {
       }
   
       this.editMode = 'draw'
+      const currentData = this;
       if (previousData) {
         const clonedData = cloneDeep(previousData)
-        Object.keys(clonedData).forEach(prop => this[prop] = clonedData[prop])
+        Object.keys(clonedData).forEach(prop => {
+          if (prop in currentData) {
+            currentData[prop] = clonedData[prop]
+          }
+        })
       }
     }
 
@@ -215,10 +220,10 @@ export class BoardData {
 
       if (selections.length == 0) {
         this.selections = selections;
-        return
+      } else {
+        const centerOfSelections = new Selection(average(selections.map(sel => sel.row)), average(selections.map(sel => sel.col)))
+        this.selections = selections.map(sel => new Selection(sel.row - centerOfSelections.row, sel.col - centerOfSelections.col))
       }
-      const centerOfSelections = new Selection(average(selections.map(sel => sel.row)), average(selections.map(sel => sel.col)))
-      this.selections = selections.map(sel => new Selection(sel.row - centerOfSelections.row, sel.col - centerOfSelections.col))
     }
 
     get count() {
@@ -226,10 +231,20 @@ export class BoardData {
     }
   }
 
+  let renderID = 0;
   export class Render {
-    constructor(startingSelections, renders = {}) {
+    constructor(startingSelections = [], renders = []) {
+      this.id = ++renderID;
       this.renders = renders
       this.startingSelections = startingSelections.map(sel => Selection.clone(sel))
+    }
+ 
+    generation(num) {
+      return num < this.renders.length ? this.renders[num] : this.renders[this.renders.length - 1]
+    }
+
+    hasGeneration(num) {
+      return num < this.renders.length;
     }
   } 
   class User {

@@ -1,3 +1,4 @@
+
 import { cloneDeep, remove } from "lodash";
 import { BoardData, Render, Selection } from "./classes.js";
 
@@ -45,7 +46,7 @@ import { BoardData, Render, Selection } from "./classes.js";
   }
 
   export function getRender(selections, generations) {
-    const renders = {}
+    const renders = new Array(generations).fill()
     let currentGeneration = selections.map(sel => Selection.clone(sel))
     for (let i = 0; i < generations; i++) {
       renders[i] = currentGeneration;
@@ -78,7 +79,7 @@ export function nextSmallestPerfectSquare(num) {
     return (Math.pow(Math.floor(Math.sqrt(num)) , 2))
 }
 
-export function average(...nums) {
+export function average(nums) {
     return nums.reduce((acc, curr) => acc + curr, 0) / nums.length
 }
 
@@ -118,7 +119,7 @@ function getRowRange(selectionList, index) {
   return range;
 }
 
-export function boardReducer(state, action) {
+export function boardStatesReducer(state, action) {
     const {type, id, request} = action;
     const chosenBoard = state.filter(board => board.id === id)?.[0];
     const newBoard = cloneDeep(chosenBoard);
@@ -173,7 +174,58 @@ export function boardReducer(state, action) {
           }
   
           const { newState } = action;
-          return state.filter(board => board.id !== id).concat(newState);
+          return state.filter(board => board.id !== id).concat(newState).sort((first, second) => first.id - second.id );
+      default:
+        console.log("No valid selected dispatch type: ", type)
+        return state
+      }
+  }
+
+  export function boardReducer(state, action) {
+    const {type, request} = action;
+    const newBoard = cloneDeep(state);
+    switch (type) {
+      case "alter":
+          if (request == null) return;
+          const {accessor = "", newValue} = request
+          const keys = accessor.split('.')
+          if (keys.length == 0 || !("newValue" in request)) return state
+      
+          
+          let currentProperty = newBoard
+          while (keys.length > 1) {
+              const key = keys.shift()
+              if (`${key}` in currentProperty) {
+                  currentProperty = currentProperty[key] 
+              } else {
+                  console.log("key ", key, " does not exist in board")
+                  return state;
+              }
+          }
+  
+          
+          const finalKey = keys.pop()
+          // console.log('final key: ', finalKey)
+      
+          if (`${finalKey}` in currentProperty) {
+              currentProperty[finalKey] = newValue
+          } else {
+              console.log("key ", finalKey, " does not exist in board")
+              return state;
+          }
+
+          if (finalKey == 'selections') {
+            currentProperty[finalKey] = getSortedSelections(newValue)
+          }
+
+          return newBoard
+        case "set state":
+          const { newState } = action;
+          if (newState === null) {
+            console.log("[boardReducer type 'set state'] Cannot set state to a new state because 'newState' is null " )
+            return state;
+          }
+          return newState
       default:
         console.log("No valid selected dispatch type: ", type)
         return state

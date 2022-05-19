@@ -7,7 +7,7 @@ import { BoardData, Pattern } from './classes'
 import { cloneDeep } from 'lodash'
 import { PatternMenu } from './components/PatternMenu'
 import { Alert } from './components/Alert'
-import { nextLargestPerfectSquare, boardReducer } from './functions'
+import { nextLargestPerfectSquare, boardStatesReducer } from './functions'
 import icon from "./assets/Conway Logo.png"
 const patterns = require("./assets/patterns.json")
 .map(patternData => new Pattern(patternData))
@@ -15,9 +15,6 @@ const patterns = require("./assets/patterns.json")
 const nextID = 0;
 
 //request: {accessor = "", newValue}
-
-
-
 
 export const ThemeContext = createContext();
 export const PatternContext = createContext();
@@ -27,7 +24,7 @@ export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
     const [showingPatternMenu, setShowingPatternMenu] = useState(false);
-    const [boardDatas, boardDatasDispatch] = useReducer(boardReducer, [new BoardData()])
+    const [boardDatas, dataDispatch] = useReducer(boardStatesReducer, [new BoardData()])
     const renders = useRef([]);
     const [savedPatterns, setSavedPatterns] = useState(patterns);
     const [theme, setTheme] = useState('')
@@ -43,7 +40,7 @@ export const App = () => {
 
   return (
       <ThemeContext.Provider value={[theme, setTheme]}>
-        <BoardContext.Provider value={[boardDatas, boardDatasDispatch]} >
+        <BoardContext.Provider value={[boardDatas, dataDispatch]} >
           <PatternContext.Provider value={[savedPatterns, setSavedPatterns]} >
             
             <RenderContext.Provider value={renders}>
@@ -52,7 +49,7 @@ export const App = () => {
                 { boardDatas.map(data => 
                 <GameBoard key={`Board ID ${data.id}`}
                 boardData={data}
-                boardDatasDispatch={boardDatasDispatch}
+                dataDispatch={dataDispatch}
                 />)}
               </div>
             </RenderContext.Provider>
@@ -73,8 +70,8 @@ export const App = () => {
 
                   </div>} */}
 
-                <button className={`add-board-button`} onClick={() => boardDatasDispatch({type: 'add'})}> Add Board </button>
-                {/* <button className={`pattern-button ${showingPatternMenu ? 'opened' : ''}`} onClick={() => setShowingPatternMenu(!showingPatternMenu)}> Pattern Menu </button> */}
+                <button className={`add-board-button`} onClick={() => dataDispatch({type: 'add'})}> Add Board </button>
+                <button className={`pattern-button ${showingPatternMenu ? 'opened' : ''}`} onClick={() => setShowingPatternMenu(!showingPatternMenu)}> Pattern Menu </button>
 
                 <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
                 { aboutMenu && <div className='about'>
@@ -89,8 +86,10 @@ export const App = () => {
                 <a href="https://www.github.com/cobyj33/Conway" target="_blank"> <button> Project Link </button> </a>
                 <a href="https://www.github.com/cobyj33/" target="_blank"> <button> Other Creations </button> </a>
             </Sidebar>
-
-            { showingPatternMenu && <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setShowingPatternMenu(false)}/>}
+            
+            <RenderContext.Provider value={renders}>
+              { showingPatternMenu && <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setShowingPatternMenu(false)}/>}
+            </RenderContext.Provider>
           </PatternContext.Provider>
         </BoardContext.Provider>
       </ThemeContext.Provider>

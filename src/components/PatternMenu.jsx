@@ -1,10 +1,10 @@
-import React, { useContext, useReducer, useRef } from 'react'
+import React, { useContext, useReducer, useRef, useEffect } from 'react'
 import "./patternmenu.css"
 import { FaChevronCircleDown, FaPlusCircle, FaWindowClose } from "react-icons/fa";
 import { DragSelect } from "./DragSelect";
 import { useState } from 'react';
-import { BoardData, Pattern } from '../classes';
-import { PatternContext } from '../App';
+import { BoardData, Pattern, Area } from '../classes';
+import { PatternContext, RenderContext } from '../App';
 import { DynamicText } from "./DynamicText"
 import { boardReducer } from '../functions';
 import { GameBoard } from './GameBoard';
@@ -20,61 +20,89 @@ import { ToolTip } from './ToolTip/ToolTip';
 
 export const PatternMenu = ({ close }) => {
   const [patterns, setPatterns] = useContext(PatternContext)
+  const renders = useContext(RenderContext)
   const [position, setPosition] = useState({left: 100, top: 100});
   const [currentMenu, setCurrentMenu] = useState('My Patterns');
   
   const menu = useRef()
+  
+
+  function getDisplayAreaContent() {
+    switch (currentMenu) {
+      case "My Renders":
+        return renders.current.length == 0 ? "No Saved Renders" : renders.current.map(render => <RenderDisplay key={render.id} render={render} />) 
+      case "My Patterns":
+        return patterns.length == 0 ? "No Saved Patterns" : patterns.map(pattern => <PatternDisplay key={pattern.id} pattern={pattern} />)
+      default: return "Error: Invalid Menu"
+    }
+  }
 
 
   const [showingMenuChoices, setShowingMenuChoices] = useState(false)
   return (
     <div className="pattern-menu" style={position} ref={menu}>
       <DragSelect position={position} setPosition={setPosition} top parentRef={menu} style={{ position: "relative", height: "min(15%, 100px)" }}>
-        <DynamicText text="Patterns" />
+        <div onMouseEnter={() => setShowingMenuChoices(true)} onMouseLeave={() => setShowingMenuChoices(false)}>
+            <h3> { currentMenu } </h3>
+            { showingMenuChoices && 
+            <div className="menu-choices">
+              <button onClick={() => setCurrentMenu("My Patterns")}> My Patterns </button>
+              <button onClick={() => setCurrentMenu("My Renders")}> My Renders </button>
+            </div> }
+        </div>
         <input className="pattern-search" type="text" />
         <button > <FaPlusCircle /> </button>
-        <div>
-          <button> View: {currentMenu} <FaChevronCircleDown /> </button>
-          { showingMenuChoices && 
-            <div className="pattern-menu-choices">
-              <button> Local </button>
-              <button> Online </button>
-              <button> Edit </button>
-            </div>}
-        </div>
         <button onClick={close}> <FaWindowClose /> </button>
       </DragSelect>
 
-      <div className="pattern-area">
-        
-        { patterns.length == 0 ? "No Saved Patterns" : patterns.map(pattern => <PatternDisplay key={pattern.id} pattern={pattern}/>) }
-
+      <div className="display-area">
+          { getDisplayAreaContent() }
       </div>
 
 
     </div>
   )
 }
+
+
+const RenderDisplay = ({ render }) => {
+  const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: render.startingSelections}));
+
+  return (
+    <div className="render-display">
+      <GameBoard boardData={boardData} dataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} />
+
+      <div className='render-display-information'> 
+        <span className='render-data'> # Of Generations: {render.renders.length} </span>
+        <span className='render-data'> Starting Cell Count: {render.startingSelections.length} </span>  
+
+        <button > Play </button>
+      </div>
+    </div>
+  )
+}
+
+
 const PatternDisplay = ({ pattern }) => {
   const [patterns, setPatterns] = useContext(PatternContext)
-  const [boardData, boardDataDispatch] = useReducer(boardReducer, [new BoardData({selections: pattern.selections})]);
+  const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: pattern.selections}));
   
   return (
     <div className="pattern-display">
-      <GameBoard boardData={boardData[0]} boardDatasDispatch={boardDataDispatch} closable={false}> </GameBoard>
+      <GameBoard boardData={boardData} dataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false}> </GameBoard>
       <button onClick={() => setPatterns(patterns.filter(pat => pat !== pattern))}> <FaChevronCircleDown /> </button>
 
       <div className='pattern-display-information'> 
         <div className='pattern-display-main-data'>
-          <DynamicText text={`Name: ${pattern.name}`} />
-          <DynamicText text={`Count: ${pattern.count}`} />
+          <span className="pattern-name pattern-data"> Name: {pattern.name} </span>
+          <span className="pattern-count pattern-data"> Count: {pattern.count} </span>
           {/* Count: { pattern.count } */}
         </div>
         <div className='pattern-display-meta-data'> 
-          Creator: {pattern.name}
-          Created: {pattern.dateCreated.toDateString()}
-          Last Modified: {pattern.lastModified.toDateString()}
-          <span> Description: {pattern.description.substr(0, 20)} { pattern.description.length > 20 ? <ToolTip> {pattern.description} </ToolTip> : '' } </span>
+          <span className="pattern-creator pattern-data"> Creator: {pattern.name} </span>
+          <span className="pattern-date pattern-data"> Created: {pattern.dateCreated.toDateString()} </span>
+          <span className="pattern-date pattern-data"> Last Modified: {pattern.lastModified.toDateString()} </span>
+          <span className="pattern-description pattern-data"> Description: {pattern.description.substr(0, 20)} { pattern.description.length > 20 ? <ToolTip> {pattern.description} </ToolTip> : '' } </span>
         </div>
 
         <div className='pattern-display-interact'>
@@ -105,3 +133,12 @@ const PatternEditor = () => {
   )
 }
 
+const VIEW_PADDING = 5;
+
+function getPatternBounds(pattern) {
+  const viewArea = Area.corners(pattern.selections);
+}
+
+function getRenderBounds(render) {
+  const topRight = new Selection(Math.min())
+}

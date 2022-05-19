@@ -1,12 +1,12 @@
 import {useRef, useState, useEffect, useContext} from 'react'
 import { Area, Selection, KeyBinding, Render } from '../classes.js'
-import { FaArrowsAlt, FaEraser, FaBrush, FaBackspace, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaFill, FaChessKing, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
+import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaFill, FaChessKing, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
 import { BsBoundingBox } from "react-icons/bs"
-import { AiFillCloseCircle, AiTwotoneQuestionCircle } from "react-icons/ai"
+import { AiFillCloseCircle } from "react-icons/ai"
 import "./gameboard.css"
 import { ToolTip } from './ToolTip/ToolTip.jsx'
-import { isEqual, shuffle } from 'lodash'
-import { isCellInSortedSelections, binarySearch, getSortedSelections, getNextGeneration, removeDuplicates, getAdjacentNeighbors, getRender } from '../functions.js'
+import { shuffle } from 'lodash'
+import { getSortedSelections, getNextGeneration, removeDuplicates, getAdjacentNeighbors, getRender } from '../functions.js'
 import { RenderContext } from '../App.js'
 
 //edit modes: draw, erase, pan, zoom, select
@@ -14,24 +14,36 @@ const DEFAULT_SCREEN_CELL_SPAN = 10;
 const MAX_FILL_DEPTH = 100;
 const MAX_CELL_WANDER_DISTANCE = 1000;
 const MIN_ZOOM = 0.05
-
-export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, closable = true } ) => {
-    const alterData = (accessor, newValue) => boardDatasDispatch({ type: 'alter', id: boardData.id, request: { accessor: accessor, newValue: newValue} })
-    const removeCallback = () => { if (closable) { boardDatasDispatch({type: 'remove', id: boardData.id}) } }
+export const GameBoard = ( { boardData, dataDispatch, editable = true, closable = true, bounds = null, showToolBar = true } ) => {
+    const alterData = (accessor, newValue) => dataDispatch({ type: 'alter', id: boardData.id, request: { accessor: accessor, newValue: newValue} })
+    const removeCallback = () => { if (closable) { dataDispatch({type: 'remove', id: boardData.id}) } }
     const renders = useContext(RenderContext)
 
-    function isRendered(selections) {
-        return renders.current.some(render => isStable(render.startingSelections, selections) )
+    function getLoadedRender(selections) {
+        const selectionsString = selections.map(sel => sel.toString()).join();
+        return renders.current.filter(render => render.startingSelections.map(sel => sel.toString()).join() === selectionsString)?.[0]
     }
+
+    const isRendered = useRef(false);
+    const loadedRender = useRef(new Render())
+    useEffect( () => {
+        const render = getLoadedRender(boardData.selections)
+        isRendered.current = render instanceof Render;
+        if (isRendered.current) {
+            loadedRender.current = render;
+        }
+    }, [boardData.selections])
 
     const canvasRef = useRef()
     const boardRef = useRef()
     const renderRequestRef = useRef()
+    const [currentGeneration, setCurrentGeneration] = useState(0);
     const [selectedArea, setSelectedArea] = useState(new Area(0, 0, 0, 0));
     const [displayBackToCenter, showDisplayBackToCenter] = useState(false);
-    const [tempSelections, setTempSelections] = useState([]);
+    // const [tempSelections, setTempSelections] = useState([]);
     const [canvasTooltip, setCanvasTooltip] = useState("")
     const [showingRenderPrompt, setShowingRenderPrompt] = useState(false)
+    const [showingToolBar, setShowingToolBar] = useState(showToolBar)
     const [brush, setBrush] = useState({
         type: 'pixel',
         size: 1,
@@ -74,14 +86,14 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
     const getCanvasBounds = () => canvasRef.current.getBoundingClientRect()
     const getCellSize = (zoom = boardData.view.zoom) => Math.min(getCanvasBounds().width, getCanvasBounds().height) / (DEFAULT_SCREEN_CELL_SPAN / Math.max(MIN_ZOOM, zoom)) //10 is the default span for the viewbox
     const getZoomfromCellSize = (cellSize) => (DEFAULT_SCREEN_CELL_SPAN * cellSize) / Math.min(getCanvasBounds().width, getCanvasBounds().height)
-    const getCellsHorizontallyAcrossScreen = () => getCanvasBounds().width / getCellSize()
-    const getCellsVerticallyAcrossScreen = () => getCanvasBounds().height / getCellSize()
+    const getCellsHorizontallyAcrossScreen = (zoom = boardData.view.zoom) => getCanvasBounds().width / getCellSize(zoom)
+    const getCellsVerticallyAcrossScreen = (zoom = boardData.view.zoom) => getCanvasBounds().height / getCellSize(zoom)
     const getAspectRatio = () => canvasRef.current ? canvasRef.current.width / canvasRef.current.height : (16 / 9)
     const getCenterCell = () => new Selection(Math.round(view.coordinates.row + getCellsVerticallyAcrossScreen() / 2), Math.round(view.coordinates.col + getCellsHorizontallyAcrossScreen() / 2))
-    const getViewArea = () => {
-        const {row: viewRow, col: viewCol} = boardData.view.coordinates;
-        const viewWidth = getCanvasBounds().width / getCellSize();
-        const viewHeight = getCanvasBounds().height / getCellSize();
+    const getViewArea = ( coordinates = boardData.view.coordinates, zoom = boardData.view.zoom ) => {
+        const {row: viewRow, col: viewCol} = coordinates;
+        const viewWidth = getCellsHorizontallyAcrossScreen(zoom)
+        const viewHeight = getCellsVerticallyAcrossScreen(zoom)
         return new Area(viewRow, viewCol, viewWidth, viewHeight)
     }
 
@@ -135,18 +147,16 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
 
         const lastBoardState = boardData.popHistory();
         if (!lastBoardState) return
-        boardDatasDispatch({type: 'set state', newState: lastBoardState, id: boardData.id});
+        dataDispatch({type: 'set state', newState: lastBoardState, id: boardData.id});
     }
   
 
     const isStable = (current = boardData.selections, last = lastGeneration.current) => {
         if (last.length !== current.length) return false
-
         for (let i = 0; i < current.length; i++) {
             if (!last.some(cell => isEqualSelection(cell, current[i])))
                 return false
         }
-
         return true
     }
 
@@ -194,9 +204,9 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
         if (depth > 0)
             return 
 
-        console.log('selections to add', selectionsToAdd);
-        console.log('selections', selections);
-        console.log('addition', selections.concat(...selectionsToAdd))
+        // console.log('selections to add', selectionsToAdd);
+        // console.log('selections', selections);
+        // console.log('addition', selections.concat(...selectionsToAdd))
         alterData('selections', selections.concat(...selectionsToAdd));
     }
 
@@ -272,9 +282,12 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
     }
     const drawEllipse = (firstPoint, secondPoint) => alterData("selections", selections.concat(getEllipse(firstPoint, secondPoint)))
 
+    function isInBounds(inner = bounds, outer = getViewArea()) {
+        if (inner == null || outer == null) return true;
+        return inner.row >= outer.row && inner.col >= outer.col && inner.rightSide <= outer.rightSide && inner.bottomSide <= outer.bottomSide;
+    }
 
     const lastMousePosition = useRef({x: 0, y: 0})
-
     const mousePan = (event) => {
         if (editMode != 'pan' || !isDragging.current) return
         const {x: lastX, y: lastY} = lastMousePosition.current
@@ -287,8 +300,11 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
         const colOffset = (currentX - lastX) / getCellSize();
         const rowOffset = (currentY - lastY) / getCellSize();
         const { view } = boardData
+        const newCoordinates = { row: view.coordinates.row + rowOffset, col: view.coordinates.col + colOffset}
         lastMousePosition.current = getMousePositionInCanvas(event) 
-        alterData('view.coordinates', { row: view.coordinates.row + rowOffset, col: view.coordinates.col + colOffset})
+        if (isInBounds(getViewArea(newCoordinates), bounds)) {
+            alterData('view.coordinates', newCoordinates)
+        }
     }
     
     const mouseZoom = event => {
@@ -463,48 +479,50 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
         const currentBox = (row, col) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize, cellSize]
         context.globalAlpha = 0.5
         
-        switch (brush.type) {
-            case "pixel": context.fillRect(...currentBox(hoveredCell.row, hoveredCell.col)); break;
-            case "pattern": pattern.forEach(cell => {
-            context.fillRect(...currentBox(cell.row + hoveredCell.row, cell.col + hoveredCell.col))
-                }); break;
-            case "line": getLine(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
-            case "box": getBox(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
-            case "ellipse": getEllipse(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
-            default: context.fillRect(...currentBox(hoveredCell.row, hoveredCell.col)); break;
+        if (editMode == "draw") {
+            switch (brush.type) {
+                case "pixel": context.fillRect(...currentBox(hoveredCell.row, hoveredCell.col)); break;
+                case "pattern": pattern.forEach(cell => {
+                context.fillRect(...currentBox(cell.row + hoveredCell.row, cell.col + hoveredCell.col))
+                    }); break;
+                case "line": getLine(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
+                case "box": getBox(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
+                case "ellipse": getEllipse(brush.extra.lineStart, hoveredCell).forEach(cell => context.fillRect(...currentBox(cell.row, cell.col))); break;
+                default: context.fillRect(...currentBox(hoveredCell.row, hoveredCell.col)); break;
+            }
         }
         
         
         context.globalAlpha = 1;
     }
     
-    const fitGap = 5
-    function screenFit() {
-        if (isEmpty()) return
+    // const fitGap = 5
+    // function screenFit() {
+    //     if (isEmpty()) return
     
-        const sortedHorizontally = displayedSelections.current.sort((first, second) => first.col - second.col)
-        const sortedVertically = displayedSelections.current.sort((first, second) => first.row - second.row)
-        const cellHorizontalSpan = Math.abs(sortedHorizontally?.[0].col - sortedHorizontally?.[sortedHorizontally.length - 1].col);
-        const cellVerticalSpan = Math.abs(sortedVertically?.[0].row - sortedVertically?.[sortedVertically.length - 1].row);
+    //     const sortedHorizontally = displayedSelections.current.sort((first, second) => first.col - second.col)
+    //     const sortedVertically = displayedSelections.current.sort((first, second) => first.row - second.row)
+    //     const cellHorizontalSpan = Math.abs(sortedHorizontally?.[0].col - sortedHorizontally?.[sortedHorizontally.length - 1].col);
+    //     const cellVerticalSpan = Math.abs(sortedVertically?.[0].row - sortedVertically?.[sortedVertically.length - 1].row);
     
-        const desiredCellSize = Math.min(getCanvasBounds().width, getCanvasBounds().height) / Math.max(cellHorizontalSpan, cellVerticalSpan) - fitGap
-        console.log('desired cell size: ', desiredCellSize)
+    //     const desiredCellSize = Math.min(getCanvasBounds().width, getCanvasBounds().height) / Math.max(cellHorizontalSpan, cellVerticalSpan) - fitGap
+    //     console.log('desired cell size: ', desiredCellSize)
     
-        const newZoom = Math.max(MIN_ZOOM, Math.min(2, getZoomfromCellSize(desiredCellSize)))
-        console.log("new zoom: ", newZoom)
+    //     const newZoom = Math.max(MIN_ZOOM, Math.min(2, getZoomfromCellSize(desiredCellSize)))
+    //     console.log("new zoom: ", newZoom)
     
-        const medianPosition = {
-            row: displayedSelections.current[Math.floor(displayedSelections.current.length / 2)].row,
-            col: displayedSelections.current[Math.floor(displayedSelections.current.length / 2)].col
-        }
+    //     const medianPosition = {
+    //         row: displayedSelections.current[Math.floor(displayedSelections.current.length / 2)].row,
+    //         col: displayedSelections.current[Math.floor(displayedSelections.current.length / 2)].col
+    //     }
     
-        alterData('view', {...boardData.view, coordinates: {
-            row: medianPosition.row - getCellsVerticallyAcrossScreen() / 2,
-            col: medianPosition.col - getCellsHorizontallyAcrossScreen() / 2
-            },
-            zoom: newZoom
-        })
-    }
+    //     alterData('view', {...boardData.view, coordinates: {
+    //         row: medianPosition.row - getCellsVerticallyAcrossScreen() / 2,
+    //         col: medianPosition.col - getCellsHorizontallyAcrossScreen() / 2
+    //         },
+    //         zoom: newZoom
+    //     })
+    // }
 
 
     const observer = useRef(new ResizeObserver(() => {resizeCanvas(); draw()}));
@@ -520,16 +538,19 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
 
     
     const frameRequested = useRef(false);
+    const isAnimating = useRef(boardData.playback.enabled)
     useEffect(() => { 
         animationStartTime.current = Date.now() 
-        // console.log("useEffect animation playback");
+        isAnimating.current = boardData.playback.enabled
         
         if (boardData.playback.enabled) {
             alterData('selections', removeDuplicates(cloneSelections(boardData.selections)))
         } else {
             lastGeneration.current = []
             frameRequested.current = false;
-            alterData('playback.currentGeneration', 0)
+            console.log("boardData selections: ", boardData.selections)
+            setDisplayedSelections(boardData.selections)
+            setCurrentGeneration(0)
         }
         
       }, [boardData.playback.enabled])
@@ -537,15 +558,16 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
       
       useEffect(() => {
           function getNextTick() {
-              if (boardData.playback.enabled) {
+              if (isAnimating.current) {
                   if (Date.now() - lastTick.current > getMillisecondsPerTick()) {
-                      const nextGeneration = getNextGeneration(displayedSelections.current, selectionSet.current);
+
+                      const nextGeneration = isRendered.current && loadedRender.current.hasGeneration(currentGeneration) ? loadedRender.current.generation(currentGeneration) : getNextGeneration(displayedSelections.current, selectionSet.current);
                       lastTick.current = Date.now()
                       lastGeneration.current = cloneSelections(displayedSelections.current)
-                      if (boardData.playback.enabled) {
+                      if (isAnimating.current) {
                           frameRequested.current = false;
                           setDisplayedSelections(getSortedSelections(nextGeneration))
-                          alterData("playback.currentGeneration", boardData.playback.currentGeneration + 1)
+                          setCurrentGeneration(currentGeneration + 1)
                       }
                   } else {
                       setTimeout(() => getNextTick(), getMillisecondsPerTick() - (Date.now() - lastTick.current))
@@ -652,19 +674,22 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
 
         
         if (!boardData.playback.enabled && editable) {
-            
-            switch(brush.type) {
-                case 'pixel': select(getHoveredCell(mouseEvent)); break;
-                case 'fill': fill(getHoveredCell(mouseEvent)); break;
-                case 'box':
-                case 'ellipse':
-                case 'line': setBrush({...brush, extra: {...brush.extra, lineStart: getHoveredCell(mouseEvent)}}); break;
+            if (editMode == "erase") {
+                select(getHoveredCell(mouseEvent))
+            } else {
+                switch(brush.type) {
+                    case 'pixel': select(getHoveredCell(mouseEvent)); break;
+                    case 'fill': fill(getHoveredCell(mouseEvent)); break;
+                    case 'box':
+                    case 'ellipse':
+                    case 'line': setBrush({...brush, extra: {...brush.extra, lineStart: getHoveredCell(mouseEvent)}}); break;
+                }
             }
         }
     }
 
     function mouseMoveListener(mouseEvent) {
-        if (!boardData.playback.enabled && (brush.type == 'pixel' || brush.type == 'pattern')) {
+        if (!boardData.playback.enabled && (brush.type == 'pixel' || brush.type == 'pattern' || editMode == "erase")) {
             DragBrush(mouseEvent); 
         }
 
@@ -683,6 +708,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
         selectingArea(mouseEvent);
         moveSelectedArea(mouseEvent);
     }
+
 
     const onInputStop = (event) => {
         lastMousePosition.current = {x: 0, y: 0}
@@ -737,7 +763,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
             default: cursor = 'crosshair'; break;
         } break;
         case 'zoom': cursor = 'url("https://img.icons8.com/external-royyan-wijaya-detailed-outline-royyan-wijaya/24/000000/external-magnifying-glass-interface-royyan-wijaya-detailed-outline-royyan-wijaya.png"), nwse-resize'; break;
-        case 'erase': cursor = 'url("https://img.icons8.com/material-rounded/24/000000/eraser.png"), crosshair'; break;
+        case 'erase': cursor = 'url("https://img.icons8.com/material-rounded/24/00000/eraser.png"), crosshair'; break;
         case 'pan': cursor = 'move'; break;
         case 'select': cursor = 'crosshair'; break;
     }
@@ -746,7 +772,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
     <div className='game-board' ref={boardRef}>
             <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onContextMenu} onMouseEnter={onMouseEnter} onMouseLeave={onInputStop} onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} tabIndex={0} style={{cursor: cursor}}/>
         { boardData.playback.enabled && <div className='animating-ui'>
-                <h3 className='generation-display'> Current Generation: { boardData.playback.currentGeneration } </h3>
+                <h3 className='generation-display'> Current Generation: { currentGeneration } </h3>
                 <div className='flex-column'>
                     <label htmlFor="speed-slider"> FPS: { boardData.settings.tickSpeed } </label>
                     <input id="speed-slider" type='range' min='1' max='100' value={boardData.settings.tickSpeed} onChange={(event) => alterData('settings.tickSpeed', Number(event.target.value))} />
@@ -759,8 +785,6 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
         
         { canvasTooltip !== "" && <ToolTip> { canvasTooltip } </ToolTip>}\
 
-        { }
-
         { showingRenderPrompt && <div className='render-prompt'>
                 <h3> How Many Generations: </h3>
                 <input ref={renderRequestRef} /> 
@@ -771,7 +795,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
                     }}> Submit </button>
             </div> }
         
-        <div className='game-toolbar flex-row'>
+        {showingToolBar && <div className='game-toolbar flex-row'>
             
             <div className="drawing-options" onMouseLeave={() => setShowingDrawingOptions(false)}>
                 <button onClick={() => editMode != 'draw' ? alterData('editMode', 'draw') : ''} onMouseEnter={() => setShowingDrawingOptions(true)}  className={`game-tool ${boardData.editMode == 'draw' ? 'selected' : 'unselected'}`}> <FaBrush /> <ToolTip> 1: Draw </ToolTip> </button>
@@ -802,7 +826,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
             {/* <button> <FaBackspace /> </button> */}
             <button onClick={clear} className={`game-tool`}> <FaRegTrashAlt /> <ToolTip> C: Clear </ToolTip> </button> 
             <button onClick={undo} className={`game-tool`}> <FaUndo /> <ToolTip> Ctrl + Z: Undo </ToolTip> </button> 
-            <button onClick={() => setShowingRenderPrompt(true)} className={`game-tool`}> <FaCamera /> <ToolTip> R: Render </ToolTip> </button> 
+            <button onClick={() => setShowingRenderPrompt(!showingRenderPrompt)} className={`game-tool`}> <FaCamera /> <ToolTip> R: Render </ToolTip> </button> 
 
             <div className='flex-column'>
                 <button onClick={() => setShowBoardDataDisplay(!showBoardDataDisplay)} className={`game-tool ${showBoardDataDisplay ? 'selected' : 'unselected'}`}> <FaChevronCircleDown />  <ToolTip> Board Data </ToolTip> </button>
@@ -820,7 +844,7 @@ export const GameBoard = ( { boardData, boardDatasDispatch, editable = true, clo
                 </div> } 
         </div>
             <button onClick={() => removeCallback?.()} className={`game-tool`}> <FaWindowClose /> <ToolTip> Esc: Exit </ToolTip> </button> 
-        </div>
+        </div>}
     </div>
   )
 }

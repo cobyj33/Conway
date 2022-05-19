@@ -30,13 +30,13 @@
     color: white;
 }
 
-.pattern-area {
+.display-area {
     display: flex;
     flex-direction: column;
     overflow-y: scroll;
 }
 
-.pattern-display {
+.pattern-display, .render-display {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -45,12 +45,12 @@
     max-height: min(75vw, 75vh); 
 }
 
-.pattern-display .game-board {
+.pattern-display .game-board, .render-display .game-board {
     width: 50%;
     aspect-ratio: 1;
 }
 
-.pattern-display-information {
+.pattern-display-information, .render-display-information {
     width: 50%;
     aspect-ratio: 1;
     display: flex;
@@ -59,9 +59,21 @@
     align-items: center;
 }
 
-.pattern-display-information > div {
+.pattern-display-information > div, .render-display-information > div {
     display: flex;
     flex-direction: row;
     justify-content: center;
     align-items: center;
+}
+
+.menu-choices {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    align-items: center;
+    background-color: black;
+}
+
+.menu-choices button {
+    border-bottom: rgb(50, 50, 50);
 }
