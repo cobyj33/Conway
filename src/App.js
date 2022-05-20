@@ -7,7 +7,7 @@ import { BoardData, Pattern } from './classes'
 import { cloneDeep } from 'lodash'
 import { PatternMenu } from './components/PatternMenu'
 import { Alert } from './components/Alert'
-import { nextLargestPerfectSquare, boardStatesReducer } from './functions'
+import { nextLargestPerfectSquare, boardStatesReducer, getBoardGridStyle } from './functions'
 import icon from "./assets/Conway Logo.png"
 const patterns = require("./assets/patterns.json")
 .map(patternData => new Pattern(patternData))
@@ -23,18 +23,33 @@ export const RenderContext = createContext();
 export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
-    const [showingPatternMenu, setShowingPatternMenu] = useState(false);
+    // const [showingPatternMenu, setShowingPatternMenu] = useState(false);
     const [boardDatas, dataDispatch] = useReducer(boardStatesReducer, [new BoardData()])
     const renders = useRef([]);
     const [savedPatterns, setSavedPatterns] = useState(patterns);
     const [theme, setTheme] = useState('')
+    const boardGrid = getBoardGridStyle(boardDatas.length)
 
-    const numOfCols = Math.ceil(Math.sqrt(boardDatas.length))
-    const numOfRows = (numOfCols - 1) + (boardDatas.length > nextLargestPerfectSquare(boardDatas.length) - Math.sqrt(nextLargestPerfectSquare(boardDatas.length)))
+    const [mainMenu, setMainMenu] = useState("game");
+    
+    function getMenu(menu) {
 
-    const boardGrid = {
-      gridTemplateColumns: `repeat(${numOfCols}, minmax(0, 1fr))`,
-      gridTemplateRows: `repeat(${numOfRows}, minmax(0, 1fr))`
+      const gameMenu = boardDatas.length > 0 ? <div className='game-area' style={boardGrid}> 
+        { boardDatas.map(data => 
+        <GameBoard key={`Board ID ${data.id}`}
+        boardData={data}
+        dataDispatch={dataDispatch}
+        />)}
+      </div> : <div className="empty-game-area"> 
+          <span style={{fontSize: "40px"}}> No Board Loaded </span>
+          <button onClick={() => dataDispatch({type: "add"})} style={{fontSize: "30px"}} > Add Board </button>
+      </div>;
+
+      switch(menu) {
+        case "game": return gameMenu;
+        case "pattern": return <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setMainMenu("game")}/>;
+        default: return gameMenu;
+      }
     }
 
 
@@ -44,13 +59,8 @@ export const App = () => {
           <PatternContext.Provider value={[savedPatterns, setSavedPatterns]} >
             
             <RenderContext.Provider value={renders}>
-              <div className='game-area' style={boardGrid}> 
-              {/* <Alert> This is a test </Alert> */}
-                { boardDatas.map(data => 
-                <GameBoard key={`Board ID ${data.id}`}
-                boardData={data}
-                dataDispatch={dataDispatch}
-                />)}
+              <div className='main-menu'>
+                { getMenu(mainMenu) }
               </div>
             </RenderContext.Provider>
 
@@ -71,7 +81,8 @@ export const App = () => {
                   </div>} */}
 
                 <button className={`add-board-button`} onClick={() => dataDispatch({type: 'add'})}> Add Board </button>
-                <button className={`pattern-button ${showingPatternMenu ? 'opened' : ''}`} onClick={() => setShowingPatternMenu(!showingPatternMenu)}> Pattern Menu </button>
+                <button className={`game-menu-button ${mainMenu == "game" ? 'opened' : ''}`} onClick={() => setMainMenu('game')}> Game Menu </button>
+                <button className={`pattern-menu-button ${mainMenu == "pattern" ? 'opened' : ''}`} onClick={() => setMainMenu('pattern')}> Pattern Menu </button>
 
                 <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
                 { aboutMenu && <div className='about'>
@@ -87,9 +98,8 @@ export const App = () => {
                 <a href="https://www.github.com/cobyj33/" target="_blank"> <button> Other Creations </button> </a>
             </Sidebar>
             
-            <RenderContext.Provider value={renders}>
-              { showingPatternMenu && <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setShowingPatternMenu(false)}/>}
-            </RenderContext.Provider>
+
+
           </PatternContext.Provider>
         </BoardContext.Provider>
       </ThemeContext.Provider>

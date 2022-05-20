@@ -4,11 +4,12 @@ import { FaChevronCircleDown, FaPlusCircle, FaWindowClose } from "react-icons/fa
 import { DragSelect } from "./DragSelect";
 import { useState } from 'react';
 import { BoardData, Pattern, Area } from '../classes';
-import { PatternContext, RenderContext } from '../App';
+import { BoardContext, PatternContext, RenderContext } from '../App';
 import { DynamicText } from "./DynamicText"
 import { boardReducer } from '../functions';
 import { GameBoard } from './GameBoard';
 import { ToolTip } from './ToolTip/ToolTip';
+import { BoardSelector } from './BoardSelector';
 
 // let patterns = [new Pattern({ selections: [{row: 0, col: 0}] })]
 
@@ -38,10 +39,9 @@ export const PatternMenu = ({ close }) => {
   }
 
 
-  const [showingMenuChoices, setShowingMenuChoices] = useState(false)
   return (
     <div className="pattern-menu" style={position} ref={menu}>
-      <DragSelect position={position} setPosition={setPosition} top parentRef={menu} style={{ position: "relative", height: "min(15%, 100px)" }}>
+      {/* <DragSelect position={position} setPosition={setPosition} top parentRef={menu} style={{ position: "relative", height: "min(15%, 100px)" }}>
         <div onMouseEnter={() => setShowingMenuChoices(true)} onMouseLeave={() => setShowingMenuChoices(false)}>
             <h3> { currentMenu } </h3>
             { showingMenuChoices && 
@@ -53,7 +53,22 @@ export const PatternMenu = ({ close }) => {
         <input className="pattern-search" type="text" />
         <button > <FaPlusCircle /> </button>
         <button onClick={close}> <FaWindowClose /> </button>
-      </DragSelect>
+      </DragSelect> */}
+
+      <div className="pattern-menu-top-bar" >
+        <div className='pattern-menu-selections'>
+            <div className="menu-choices">
+              <button onClick={() => setCurrentMenu("My Patterns")}> My Patterns </button>
+              <button onClick={() => setCurrentMenu("My Renders")}> My Renders </button>
+            </div>
+        </div>
+        <div className="pattern-menu-top-bar-options">
+            <h3> { currentMenu } </h3>
+            <input className="pattern-search" type="text" />
+            <button > <FaPlusCircle /> </button>
+            <button onClick={close}> <FaWindowClose /> <ToolTip> To Game </ToolTip> </button>
+        </div>
+      </div>
 
       <div className="display-area">
           { getDisplayAreaContent() }
@@ -67,6 +82,21 @@ export const PatternMenu = ({ close }) => {
 
 const RenderDisplay = ({ render }) => {
   const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: render.startingSelections}));
+  const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
+  const [showingBoardSelector, setShowingBoardSelector] = useState(false);
+
+  function onBoardSelection(boardNum) {
+    if (boardNum == -1) {
+      gameBoardsDispatch({type: "add", boardData: boardData})
+    } else {
+      gameBoardsDispatch({type: "alter",
+      id: gameBoards[boardNum].id,
+      request: {
+        accessor: "selections",
+        newValue: render.startingSelections.map(cell => Selection.clone(cell))
+      }})
+    }
+  }
 
   return (
     <div className="render-display">
@@ -77,7 +107,10 @@ const RenderDisplay = ({ render }) => {
         <span className='render-data'> Starting Cell Count: {render.startingSelections.length} </span>  
 
         <button > Play </button>
+        <button onClick={() => setShowingBoardSelector(!showingBoardSelector)}> Add to Main View </button>
       </div>
+
+      { showingBoardSelector && <BoardSelector onSelection={onBoardSelection} onClose={() => setShowingBoardSelector(!showingBoardSelector) } /> } 
     </div>
   )
 }

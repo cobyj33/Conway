@@ -1,6 +1,6 @@
 
 import { cloneDeep, remove } from "lodash";
-import { BoardData, Render, Selection } from "./classes.js";
+import { Area, BoardData, Render, Selection } from "./classes.js";
 
   export function getAdjacentNeighbors(selection) {
     const {row: centerRow, col: centerCol} = selection
@@ -41,7 +41,6 @@ import { BoardData, Render, Selection } from "./classes.js";
   }
 
   export function getAreasToCheck(selections) {
-    console.log(selections)
       return removeDuplicates(selections.flatMap(sel => [...getNeighbors(sel), Selection.clone(sel)]))
   }
 
@@ -70,6 +69,12 @@ import { BoardData, Render, Selection } from "./classes.js";
     return testCells.filter(nextGenFilter)
   }   
 
+  export function equalSelectionLists(firstList, secondList) {
+    if (firstList.length !== secondList.length) return false
+    const firstSet = new Set(firstList.map(sel => sel.toString()))
+    return secondList.every(sel => firstSet.has(sel.toString()))
+  }
+
 
 export function nextLargestPerfectSquare(num) {
     return (Math.pow(Math.ceil(Math.sqrt(num)) , 2))
@@ -85,12 +90,12 @@ export function average(nums) {
 
 export function getSortedSelections(selections) {
   return selections.map(cell => Selection.clone(cell))
-  .sort((cell1, cell2) => cell1.row - cell2.row + (cell1.col - cell2.col) / 1000)
+  .sort((cell1, cell2) => cell1.row - cell2.row + (cell1.col - cell2.col) / 100000)
 }
 
 export function isCellInSortedSelections(selection, selectionList) {
   const testIndex = binarySearch(selectionList.map(cell => cell.row), selection.row)
-  if (testIndex == -1)
+  if (testIndex === -1)
     return false;
 
 
@@ -103,20 +108,45 @@ function getRowRange(selectionList, index) {
   const desiredRow = selectionList[index].row;
   let indexIterator = -1;
   while ((index + indexIterator) >= 0) {
-    if (selectionList[index + indexIterator].row == desiredRow) {
+    if (selectionList[index + indexIterator].row === desiredRow) {
       indexIterator--;
     } else { break; }
   }
 
   indexIterator++;
   while ((index + indexIterator) < selectionList.length) {
-    if (selectionList[index + indexIterator].row == desiredRow) {
+    if (selectionList[index + indexIterator].row === desiredRow) {
       range.push(Selection.clone(selectionList[index + indexIterator]))
       indexIterator++;
     } else { break; }
   }
 
   return range;
+}
+
+const BOUNDS_PADDING = 10
+export function getPatternBounds(pattern) {
+  const { selections } = pattern;
+  const [top, bottom] = [selections[0].row, selections[selections.length - 1].row]
+  const [left, right] = [selections[0].col, selections[selections.length - 1].col]
+  return new Area(top - BOUNDS_PADDING, left - BOUNDS_PADDING, Math.abs(left - right) + (BOUNDS_PADDING * 2), Math.abs(top - bottom) +(BOUNDS_PADDING * 2))
+}
+
+export function getRenderBounds(render) {
+  const { renders } = render;
+  const [top, bottom] = [Math.min(renders.map(frame => frame?.[0]?.row)), Math.max(renders.map(frame => frame?.[frame.length - 1]?.row))]
+  const [left, right] = [Math.min(renders.map(frame => frame?.[0]?.col)), Math.max(renders.map(frame => frame?.[frame.length - 1]?.col))]
+  return new Area(top - BOUNDS_PADDING, left - BOUNDS_PADDING, Math.abs(left - right) + (BOUNDS_PADDING * 2), Math.abs(top - bottom) +(BOUNDS_PADDING * 2))
+}
+
+export function getBoardGridStyle(numOfBoards) {
+  const numOfCols = Math.ceil(Math.sqrt(numOfBoards))
+  const numOfRows = (numOfCols - 1) + (numOfBoards > nextLargestPerfectSquare(numOfBoards) - Math.sqrt(nextLargestPerfectSquare(numOfBoards)))
+
+  return {
+    gridTemplateColumns: `repeat(${numOfCols}, minmax(0, 1fr))`,
+    gridTemplateRows: `repeat(${numOfRows}, minmax(0, 1fr))`
+  }
 }
 
 export function boardStatesReducer(state, action) {
@@ -129,15 +159,15 @@ export function boardStatesReducer(state, action) {
           console.log("cannot remove a board with no id");
           return state;
         }
-  
         return state.filter(board => board.id !== id)
       case "add":
-        return state.concat(new BoardData())
+        const { boardData } = action;
+        return boardData == null ? state.concat(new BoardData()) : state.concat(new BoardData(boardData))
       case "alter":
         if (!chosenBoard) return state
           const {accessor = "", newValue} = request
           const keys = accessor.split('.')
-          if (keys.length == 0 || !("newValue" in request) || !chosenBoard) return state
+          if (keys.length === 0 || !("newValue" in request) || !chosenBoard) return state
       
           
           let currentProperty = newBoard
@@ -162,7 +192,7 @@ export function boardStatesReducer(state, action) {
                 return state;
           }
 
-          if (finalKey == 'selections') {
+          if (finalKey === 'selections') {
             currentProperty[finalKey] = getSortedSelections(newValue)
           }
 
@@ -189,7 +219,7 @@ export function boardStatesReducer(state, action) {
           if (request == null) return;
           const {accessor = "", newValue} = request
           const keys = accessor.split('.')
-          if (keys.length == 0 || !("newValue" in request)) return state
+          if (keys.length === 0 || !("newValue" in request)) return state
       
           
           let currentProperty = newBoard
@@ -214,7 +244,7 @@ export function boardStatesReducer(state, action) {
               return state;
           }
 
-          if (finalKey == 'selections') {
+          if (finalKey === 'selections') {
             currentProperty[finalKey] = getSortedSelections(newValue)
           }
 
@@ -240,7 +270,7 @@ export function binarySearch(list, target) {
     while (left < right) {
       mid = Math.floor((right + left) / 2);
   
-      if (list[mid] == target) {
+      if (list[mid] === target) {
         return mid;
       } else if (list[mid] < target) {
         left = mid + 1;
@@ -250,7 +280,7 @@ export function binarySearch(list, target) {
     }
   
     mid = Math.floor((right + left) / 2);
-    if (list[mid] == target) {
+    if (list[mid] === target) {
       return mid;
     }
   

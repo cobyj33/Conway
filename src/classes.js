@@ -77,6 +77,10 @@ export class Selection {
         
         return ((this.row <= row && this.row + this.height > row) || (row <= this.row && row + height > this.row)) && ((this.col <= col && this.col + this.width > col) || (col <= this.col && col + width > this.col))
     }
+
+    encapsulates(area) {
+      
+    }
   }
   
   export class KeyBinding {
