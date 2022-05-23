@@ -1,13 +1,10 @@
-import React, { createContext, useEffect, useReducer, useRef, useState } from 'react'
+import React, { createContext, useReducer, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import './app.css'
 import { GameBoard } from './components/GameBoard'
-import { FaMoon } from "react-icons/fa"
-import { BoardData, Pattern } from './classes'
-import { cloneDeep } from 'lodash'
+import { BoardData, Pattern, Selection } from './classes'
 import { PatternMenu } from './components/PatternMenu'
-import { Alert } from './components/Alert'
-import { nextLargestPerfectSquare, boardStatesReducer, getBoardGridStyle } from './functions'
+import { boardStatesReducer, getBoardGridStyle, selectionListToString, getNextGeneration} from './functions'
 import icon from "./assets/Conway Logo.png"
 const patterns = require("./assets/patterns.json")
 .map(patternData => new Pattern(patternData))
@@ -20,12 +17,90 @@ export const ThemeContext = createContext();
 export const PatternContext = createContext();
 export const BoardContext = createContext();
 export const RenderContext = createContext();
+
+export let AFK = false;
+const TIME_TO_AFK_MODE = 1000;
+let lastInput = Date.now();
+
+function onInput() {
+  lastInput = Date.now();
+  setTimeout(() => { AFK = Date.now() - lastInput > TIME_TO_AFK_MODE; console.log("is AFK: ", AFK) } , TIME_TO_AFK_MODE + 500)
+}
+
+window.addEventListener("mouseup", onInput)
+window.addEventListener("mousedown", onInput)
+window.addEventListener("keydown", onInput)
+window.addEventListener("keyup", onInput)
+
 export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
     // const [showingPatternMenu, setShowingPatternMenu] = useState(false);
     const [boardDatas, dataDispatch] = useReducer(boardStatesReducer, [new BoardData()])
-    const renders = useRef([]);
+    const renders = useRef({
+      starters: [],
+      frames: {
+
+      },
+
+      isCycled(startingSelectionsJSON) {
+        let currentString = startingSelectionsJSON
+        const passedThrough = new Set([])
+
+        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
+          passedThrough.add(currentString)
+          currentString = this.frames[currentString]
+        }
+
+        return passedThrough.has(currentString)
+      },
+
+      generationCount(startingSelectionsJSON) {
+        let count = 0;
+        let currentString = startingSelectionsJSON
+        const passedThrough = new Set([])
+
+        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
+          passedThrough.add(currentString)
+          currentString = this.frames[currentString]
+          count++;
+        }
+
+        if (passedThrough.has(currentString))
+          return Infinity;
+        return count;
+      },
+
+      render(startingSelectionsJSON, generations = 0) {
+        console.log("generations: ", generations)
+        if (generations <= 0) {
+          console.error("[App.render()] cannot render " + generations + " generations");
+          return
+        }
+        
+        let currentString = startingSelectionsJSON
+        if (this.starters.some(selListString => selListString === currentString)) {
+          console.log("already rendered");
+        }
+        let currentGeneration = 0;
+        this.starters.push(startingSelectionsJSON)
+
+        while ( currentGeneration <= generations && !( currentString in this.frames) ) {
+          this.frames[currentString] = JSON.stringify( (getNextGeneration(JSON.parse(currentString)) ) )
+          currentString = this.frames[currentString]
+          currentGeneration++
+          this.status.percentage = Math.round( (currentGeneration / generations) * 100)
+        }
+
+        console.log("renders object: ", this)
+        this.status.percentage = 0;
+      }, 
+
+      getNextFrame(currentFrameString) {
+        return this.frames[currentFrameString]
+      }
+    });
+
     const [savedPatterns, setSavedPatterns] = useState(patterns);
     const [theme, setTheme] = useState('')
     const boardGrid = getBoardGridStyle(boardDatas.length)
@@ -51,6 +126,10 @@ export const App = () => {
         default: return gameMenu;
       }
     }
+
+    
+
+    
 
 
   return (
@@ -105,5 +184,6 @@ export const App = () => {
       </ThemeContext.Provider>
   )
 }
+
 
 export default App

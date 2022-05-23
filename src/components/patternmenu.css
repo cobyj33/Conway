@@ -61,8 +61,8 @@
     flex-direction: row;
     flex-wrap: nowrap;
     padding: 10px;
-    max-width: min(75vw, 75vh);
-    max-height: min(75vw, 75vh); 
+    max-width: 100vw;
+    max-height: 100vh; 
 }
 
 .pattern-display .game-board, .render-display .game-board {

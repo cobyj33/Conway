@@ -2,6 +2,9 @@
 import { cloneDeep, remove } from "lodash";
 import { Area, BoardData, Render, Selection } from "./classes.js";
 
+const audioContext = new AudioContext()
+export function currentTime() { return audioContext.currentTime }
+
   export function getAdjacentNeighbors(selection) {
     const {row: centerRow, col: centerCol} = selection
     return [
@@ -26,7 +29,7 @@ import { Area, BoardData, Render, Selection } from "./classes.js";
     const tracker = new Set([])
 
     return selectionList.filter(cell => {
-        const cellString = cell.toString();
+        const cellString = JSON.stringify(cell);
         if (tracker.has(cellString)) {
             return false;
         } else {
@@ -37,32 +40,49 @@ import { Area, BoardData, Render, Selection } from "./classes.js";
   }
 
   export function getLiveNeighbors(selection, living) {
-    return getNeighbors(selection).filter(neighbor => living.has(neighbor.toString()) )
+    return getNeighbors(selection).filter(neighbor => living.has(JSON.stringify(neighbor)))
+  }
+
+  export function getLiveNeighborCount(selection, living) {
+    let count = 0;
+    for (let row = selection.row - 1; row <= selection.row + 1; row++) {
+      for (let col = selection.col - 1; col <= selection.col + 1; col++) {
+        if ( !(row === selection.row && col === selection.col)) {
+          count += living.has(JSON.stringify(new Selection(row, col)))
+        }
+      }
+    }
+    return count;
   }
 
   export function getAreasToCheck(selections) {
-      return removeDuplicates(selections.flatMap(sel => [...getNeighbors(sel), Selection.clone(sel)]))
+      const areas = new Set([])
+      selections.forEach(cell => [...getNeighbors(cell), Selection.clone(cell)].forEach(checkedCell => areas.add(JSON.stringify(checkedCell))))
+      return [...areas].map(area => JSON.parse(area))
   }
 
-  export function getRender(selections, generations) {
-    const renders = new Array(generations).fill()
-    let currentGeneration = selections.map(sel => Selection.clone(sel))
-    for (let i = 0; i < generations; i++) {
-      renders[i] = currentGeneration;
-      currentGeneration = getNextGeneration(currentGeneration, new Set(currentGeneration.map(cell => cell.toString())))
-    }
+  // export function getRender(selections, generations) {
+  //   const renders = new Array(generations).fill()
+  //   let currentGeneration = selections.map(sel => Selection.clone(sel))
+  //   for (let i = 0; i < generations; i++) {
+  //     renders[i] = currentGeneration;
+  //     currentGeneration = getNextGeneration(currentGeneration, new Set(currentGeneration.map(cell => JSON.stringify(cell))))
+  //   }
 
-    return new Render(selections.map(sel => Selection.clone(sel)), renders)
-  } 
+  //   return new Render(selections.map(sel => Selection.clone(sel)), renders)
+  // } 
 
   export function getNextGeneration(selections, selectionSet) {
+    if (selectionSet == null) {
+      selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
+    }
+
     const testCells = getAreasToCheck(selections);
     const nextGenFilter = cell => {
-        const numOfLiveNeighbors = getLiveNeighbors(cell, selectionSet).length
-        if (selectionSet.has(cell.toString())) {
+        const numOfLiveNeighbors = getLiveNeighborCount(cell, selectionSet)
+        if (selectionSet.has(JSON.stringify(cell))) {
             return numOfLiveNeighbors === 2 || numOfLiveNeighbors === 3 
         } 
-
         return numOfLiveNeighbors === 3
     }
 
@@ -71,8 +91,8 @@ import { Area, BoardData, Render, Selection } from "./classes.js";
 
   export function equalSelectionLists(firstList, secondList) {
     if (firstList.length !== secondList.length) return false
-    const firstSet = new Set(firstList.map(sel => sel.toString()))
-    return secondList.every(sel => firstSet.has(sel.toString()))
+    const firstSet = new Set(firstList.map(sel => JSON.stringify(sel)))
+    return secondList.every(sel => firstSet.has(JSON.stringify(sel)))
   }
 
 
@@ -88,9 +108,10 @@ export function average(nums) {
     return nums.reduce((acc, curr) => acc + curr, 0) / nums.length
 }
 
+const COLUMN_PRECISION = Math.pow(2, 16);
 export function getSortedSelections(selections) {
   return selections.map(cell => Selection.clone(cell))
-  .sort((cell1, cell2) => cell1.row - cell2.row + (cell1.col - cell2.col) / 100000)
+  .sort((cell1, cell2) => cell1.row - cell2.row + (cell1.col - cell2.col) / COLUMN_PRECISION)
 }
 
 export function isCellInSortedSelections(selection, selectionList) {
@@ -149,6 +170,13 @@ export function getBoardGridStyle(numOfBoards) {
   }
 }
 
+export function millisecondsToTimeString(milliseconds) {
+  const minutes = Math.floor(milliseconds / 1000 / 60)
+  const seconds = Math.floor(( milliseconds - ( minutes * 60 * 1000) ) / 1000)
+  const remainingMilliseconds = Math.floor(milliseconds - (seconds * 1000) - (minutes * 1000 * 60))
+  return ` ${ minutes } minute${minutes === 1 ? "" : "s"}, ${ seconds } second${seconds === 1 ? "" : "s"}, ${ remainingMilliseconds } m${remainingMilliseconds === 1 ? "" : "s"} `
+}
+
 export function boardStatesReducer(state, action) {
     const {type, id, request} = action;
     const chosenBoard = state.filter(board => board.id === id)?.[0];
@@ -192,9 +220,9 @@ export function boardStatesReducer(state, action) {
                 return state;
           }
 
-          if (finalKey === 'selections') {
-            currentProperty[finalKey] = getSortedSelections(newValue)
-          }
+          // if (finalKey === 'selections') {
+          //   currentProperty[finalKey] = getSortedSelections(newValue)
+          // }
 
         return state.filter(board => board.id !== id).concat(newBoard).sort((first, second) => first.id - second.id)
         case "set state":
@@ -244,9 +272,9 @@ export function boardStatesReducer(state, action) {
               return state;
           }
 
-          if (finalKey === 'selections') {
-            currentProperty[finalKey] = getSortedSelections(newValue)
-          }
+          // if (finalKey === 'selections') {
+          //   currentProperty[finalKey] = getSortedSelections(newValue)
+          // }
 
           return newBoard
         case "set state":

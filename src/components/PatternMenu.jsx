@@ -1,11 +1,9 @@
 import React, { useContext, useReducer, useRef, useEffect } from 'react'
 import "./patternmenu.css"
 import { FaChevronCircleDown, FaPlusCircle, FaWindowClose } from "react-icons/fa";
-import { DragSelect } from "./DragSelect";
 import { useState } from 'react';
-import { BoardData, Pattern, Area } from '../classes';
+import { BoardData, Area } from '../classes';
 import { BoardContext, PatternContext, RenderContext } from '../App';
-import { DynamicText } from "./DynamicText"
 import { boardReducer } from '../functions';
 import { GameBoard } from './GameBoard';
 import { ToolTip } from './ToolTip/ToolTip';
@@ -31,7 +29,7 @@ export const PatternMenu = ({ close }) => {
   function getDisplayAreaContent() {
     switch (currentMenu) {
       case "My Renders":
-        return renders.current.length == 0 ? "No Saved Renders" : renders.current.map(render => <RenderDisplay key={render.id} render={render} />) 
+        return renders.current.length == 0 ? "No Saved Renders" : renders.current.starters.map(startingSelectionsJSON => <RenderDisplay key={startingSelectionsJSON} startingSelectionsJSON={startingSelectionsJSON}/>) 
       case "My Patterns":
         return patterns.length == 0 ? "No Saved Patterns" : patterns.map(pattern => <PatternDisplay key={pattern.id} pattern={pattern} />)
       default: return "Error: Invalid Menu"
@@ -80,10 +78,13 @@ export const PatternMenu = ({ close }) => {
 }
 
 
-const RenderDisplay = ({ render }) => {
-  const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: render.startingSelections}));
+const RenderDisplay = ({ startingSelectionsJSON }) => {
+
+
+  const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: JSON.parse(startingSelectionsJSON), }));
   const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
   const [showingBoardSelector, setShowingBoardSelector] = useState(false);
+  const renders = useContext(RenderContext)
 
   function onBoardSelection(boardNum) {
     if (boardNum == -1) {
@@ -93,18 +94,26 @@ const RenderDisplay = ({ render }) => {
       id: gameBoards[boardNum].id,
       request: {
         accessor: "selections",
-        newValue: render.startingSelections.map(cell => Selection.clone(cell))
+        newValue: JSON.parse(startingSelectionsJSON)
       }})
     }
   }
 
+
+  const [generationCount, setGenerationCount] = useState(0);
+  const [startingSelectionsLength, setStartingSelectionsLength] = useState(0)
+  useEffect( () => {
+    setGenerationCount(renders.current.generationCount(startingSelectionsJSON));
+    setStartingSelectionsLength(JSON.parse(startingSelectionsJSON).length)
+  }, [])
+
   return (
     <div className="render-display">
-      <GameBoard boardData={boardData} dataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} />
+      <GameBoard boardData={boardData} dataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} drawGrid={false} />
 
       <div className='render-display-information'> 
-        <span className='render-data'> # Of Generations: {render.renders.length} </span>
-        <span className='render-data'> Starting Cell Count: {render.startingSelections.length} </span>  
+        <span className='render-data'> # Of Generations: {generationCount} </span>
+        <span className='render-data'> Starting Cell Count: {startingSelectionsLength} </span>  
 
         <button > Play </button>
         <button onClick={() => setShowingBoardSelector(!showingBoardSelector)}> Add to Main View </button>

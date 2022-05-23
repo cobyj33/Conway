@@ -1,13 +1,13 @@
 import {useRef, useState, useEffect, useContext} from 'react'
 import { Area, Selection, KeyBinding, Render } from '../classes.js'
-import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaFill, FaChessKing, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
+import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
 import { BsBoundingBox } from "react-icons/bs"
 import { AiFillCloseCircle } from "react-icons/ai"
 import "./gameboard.css"
 import { ToolTip } from './ToolTip/ToolTip.jsx'
 import { shuffle } from 'lodash'
-import { getSortedSelections, getNextGeneration, removeDuplicates, getAdjacentNeighbors, getRender, equalSelectionLists } from '../functions.js'
-import { RenderContext } from '../App.js'
+import { getSortedSelections, getNextGeneration, removeDuplicates, getAdjacentNeighbors, equalSelectionLists, millisecondsToTimeString, average, currentTime } from '../functions.js'
+import { AFK, RenderContext } from '../App.js'
 
 //edit modes: draw, erase, pan, zoom, select
 const DEFAULT_SCREEN_CELL_SPAN = 10;
@@ -18,29 +18,31 @@ const MIN_PLAYBACK_ZOOM = 0.01;
 const ZOOM_SHRINK_GRID_LINES = 0.1;
 const DEFAULT_GRID_LINE_WIDTH = 1;
 
-export const GameBoard = ( { boardData, dataDispatch, editable = true, closable = true, bounds = null, showToolBar = true, movable = true } ) => {
+const initialRenderStatus = {
+        queued: false,
+        percentage: 0,
+        timeToCompletion: 0,
+        requested: {
+            generationCount: 0,
+            currentGenerationCount: 0,
+            currentGeneration: "",
+        },
+    }
+
+export const GameBoard = ( { boardData, dataDispatch, editable = true, closable = true, bounds = null, showToolBar = true, movable = true, drawGrid = true, initialViewArea = null } ) => {
     const alterData = (accessor, newValue) => dataDispatch({ type: 'alter', id: boardData.id, request: { accessor: accessor, newValue: newValue} })
     const removeCallback = () => { if (closable) { dataDispatch({type: 'remove', id: boardData.id}) } }
     const renders = useContext(RenderContext)
-
-    function getLoadedRender(selections) {
-        const selectionsString = selections.map(sel => sel.toString()).join();
-        return renders.current.filter(render => render.startingSelections.map(sel => sel.toString()).join() === selectionsString)?.[0]
-    }
-
-    const isRendered = useRef(false);
-    const loadedRender = useRef(new Render())
-    useEffect( () => {
-        const render = getLoadedRender(boardData.selections)
-        isRendered.current = render instanceof Render;
-        if (isRendered.current) {
-            loadedRender.current = render;
-        }
-    }, [boardData.selections])
+    const [renderStatus, setRenderStatus] = useState(initialRenderStatus)
     
     useEffect( () => {
-        console.log('loaded: centering camera')
-        centerCamera({row: 0, col: 0})
+        // console.log('loaded: centering camera')
+        if (initialViewArea) {
+            
+        } else {
+            centerCamera({row: 0, col: 0})
+        }
+
     }, [])
 
     const canvasRef = useRef()
@@ -65,18 +67,19 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
 
     const { id, settings, view, selections, editMode } = boardData
     
-    const displayedSelections = useRef(boardData.selections);
+    const displayedSelections = useRef(JSON.stringify(boardData.selections));
     const setDisplayedSelections = (value) => {
         displayedSelections.current = value;
         draw();
     }
+
     const selectionSet = useRef(new Set())
     useEffect(() => {
-        selectionSet.current = new Set(displayedSelections.current.map(cell => cell.toString()))
+        selectionSet.current = new Set(JSON.parse(displayedSelections.current).map(cell => JSON.stringify(cell)))
     }, [displayedSelections.current])
 
 
-    const isSelected = (selection) => selectionSet.current.has(selection.toString())
+    const isSelected = (selection) => selectionSet.current.has(JSON.stringify(selection))
     
     const resizeCanvas = () => {
         if (!canvasRef.current) return
@@ -85,11 +88,11 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
     }
 
     const animationStartTime = useRef(Date.now())
-    const movingSelectedArea = useRef(false)
-    const lastGeneration = useRef([])
     const lastTick = useRef(Date.now())
-    const isDragging = useRef(false)
+    const lastGeneration = useRef("")
     const lastHoveredCell = useRef(new Selection(0, 0))
+    const movingSelectedArea = useRef(false)
+    const isDragging = useRef(false)
     const getMillisecondsPerTick = () => 1000 / boardData.settings.tickSpeed
     const getContext = () => canvasRef.current.getContext("2d")
     const getCanvasBounds = () => canvasRef.current.getBoundingClientRect()
@@ -140,10 +143,8 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
             })
     }
 
-    const cloneSelections = (selectionList) => selectionList.map(sel => Selection.clone(sel))
-
     function clear() {
-        lastGeneration.current = []
+        lastGeneration.current = ""
         alterData('selections', [])
       }
 
@@ -159,14 +160,7 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
     }
   
 
-    const isStable = (current = boardData.selections, last = lastGeneration.current) => {
-        if (last.length !== current.length) return false
-        for (let i = 0; i < current.length; i++) {
-            if (!last.some(cell => isEqualSelection(cell, current[i])))
-                return false
-        }
-        return true
-    }
+    const isStable = (current = displayedSelections.current, last = lastGeneration.current) => current === last 
 
     const getMousePositionInCanvas = (mouseEvent) => {
         if (!canvasRef.current) return {x: 0, y: 0}
@@ -188,17 +182,18 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
     const DragBrush = (event) => {
         if (!isDragging.current || !(editMode == 'draw' || editMode == 'erase') || movingSelectedArea.current) return
         const cell = getHoveredCell(event);
+        const toEdit = getLine(lastHoveredCell.current, cell);
         if (editMode == 'erase') {
-            alterData("selections", selections.filter(sel => !isEqualSelection(cell, sel)))
+            const toEditSet = new Set(toEdit.map(cell => JSON.stringify(cell)))
+            alterData("selections", removeDuplicates(selections.filter(cell => !toEditSet.has(JSON.stringify(cell)) )) )
         } else if (editMode == 'draw') {
             if (!isSelected(cell)) {
-                alterData("selections", selections.concat(cell) )
+                alterData("selections", removeDuplicates(selections.concat(toEdit)) )
             }
         }
     }
 
     function fill(selection, depth = 0, selectionsToAdd = []) {
-        console.log('filling ', selection);
         if (depth > MAX_FILL_DEPTH) return
 
         const neighbors = shuffle(getAdjacentNeighbors(selection))
@@ -212,38 +207,43 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         if (depth > 0)
             return 
 
-        // console.log('selections to add', selectionsToAdd);
-        // console.log('selections', selections);
-        // console.log('addition', selections.concat(...selectionsToAdd))
         alterData('selections', selections.concat(...selectionsToAdd));
     }
 
     function getLine(firstPoint, secondPoint) {
         if (firstPoint == null || secondPoint == null) return []
+        if (JSON.stringify(firstPoint) === JSON.stringify(secondPoint)) return [Selection.clone(firstPoint)];
         const {row: row1, col: col1} = firstPoint;
         const {row: row2, col: col2} = secondPoint;
         const intersections = []
 
-        if (firstPoint.col - secondPoint.col == 0) {
+        if (col1 === col2) {
             for (let row = Math.min(row1, row2); row <= Math.max(row1, row2); row++) {
                 intersections.push(new Selection(Math.floor(row), Math.floor(col1)))
+            }
+        }
+        else if (row1 === row2) {
+            for (let col = Math.min(col1, col2); col <= Math.max(col1, col2); col++) {
+                intersections.push(new Selection(Math.floor(row1), Math.floor(col)))
             }
         } else {
             const slope = (firstPoint.row - secondPoint.row) / (firstPoint.col - secondPoint.col)
             const yIntercept = row1 - (slope * col1);
-            console.log('y-intercept: ', yIntercept)
 
-            const changeInX = (Math.max(col1, col2) - Math.min(col1, col2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
-            
-            for (let col = Math.min(col1, col2); col <= Math.max(col1, col2); col += changeInX) {
+            for (let col = Math.min(col1, col2); col <= Math.max(col1, col2); col++) {
                 const row = (slope * col) + yIntercept;
+                intersections.push(new Selection(Math.floor(row), Math.floor(col)));
+            }
+
+            for (let row = Math.min(row1, row2); row <= Math.max(row1, row2); row++) {
+                const col = (row - yIntercept) / slope;
                 intersections.push(new Selection(Math.floor(row), Math.floor(col)));
             }
         }   
         
         return removeDuplicates(intersections)
     }
-    const drawLine = (firstPoint, secondPoint) => alterData("selections", selections.concat(getLine(firstPoint, secondPoint)))
+    const drawLine = (firstPoint, secondPoint) => alterData("selections", removeDuplicates(selections.concat(getLine(firstPoint, secondPoint))))
 
     function getBox(firstPoint, secondPoint) {
         if (firstPoint == null || secondPoint == null) return []
@@ -256,7 +256,7 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
             getLine(new Selection(Math.max(row1, row2), Math.max(col1, col2)), new Selection(Math.max(row1, row2), Math.min(col1, col2))),
         )
     }
-    const drawBox = (firstPoint, secondPoint) => alterData("selections", selections.concat(getBox(firstPoint, secondPoint)))
+    const drawBox = (firstPoint, secondPoint) => alterData("selections", removeDuplicates(selections.concat(getBox(firstPoint, secondPoint))))
 
     function getEllipse(firstPoint, secondPoint) {
         if (firstPoint == null || secondPoint == null) return []
@@ -272,15 +272,15 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
             return getLine(firstPoint, secondPoint)
         }
 
-        const changeInX = (Math.abs(col1 - col2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
-        const changeInY = (Math.abs(row1 - row2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
-        for (let col = Math.min(firstPoint.col, secondPoint.col); col <= Math.max(firstPoint.col, secondPoint.col); col += changeInX) {
+        // const changeInX = (Math.abs(col1 - col2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
+        // const changeInY = (Math.abs(row1 - row2)) / (Selection.distanceBetween(firstPoint, secondPoint) * 2);
+        for (let col = Math.min(firstPoint.col, secondPoint.col); col <= Math.max(firstPoint.col, secondPoint.col); col += 1) {
             const evaluation = Math.sqrt(Math.pow(verticalRadius, 2) * (1  - (Math.pow(col - centerCol, 2) / Math.pow(horizontalRadius, 2) ) ))
             intersections.push(new Selection(Math.floor(centerRow + evaluation), Math.floor(col)));
             intersections.push(new Selection(Math.floor(centerRow - evaluation), Math.floor(col)));
         } 
 
-        for (let row = Math.min(firstPoint.row, secondPoint.row); row <= Math.max(firstPoint.row, secondPoint.row); row += changeInY) {
+        for (let row = Math.min(firstPoint.row, secondPoint.row); row <= Math.max(firstPoint.row, secondPoint.row); row += 1) {
             const evaluation = Math.sqrt(Math.pow(horizontalRadius, 2) * (1  - (Math.pow(row - centerRow, 2) / Math.pow(verticalRadius, 2) ) ))
             intersections.push(new Selection(Math.floor(row), Math.floor(centerCol + evaluation)));
             intersections.push(new Selection(Math.floor(row), Math.floor(centerCol - evaluation)));
@@ -288,7 +288,7 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         
         return removeDuplicates(intersections)
     }
-    const drawEllipse = (firstPoint, secondPoint) => alterData("selections", selections.concat(getEllipse(firstPoint, secondPoint)))
+    const drawEllipse = (firstPoint, secondPoint) => alterData("selections", removeDuplicates(selections.concat(getEllipse(firstPoint, secondPoint))))
 
     function isInBounds(inner = bounds, outer = getViewArea()) {
         if (inner == null || outer == null) return true;
@@ -351,13 +351,14 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
     
     const select = (centerSelection) => {
         const { pattern } = boardData
-        console.log("selectiong ", centerSelection)
         if (editMode == 'erase') {
-            alterData("selections", selections.filter(sel => 
-            !pattern.some(patternCell => 
-            isEqualSelection(new Selection(patternCell.row + centerSelection.row, patternCell.col + centerSelection.col), sel))) )
+            alterData("selections", selections.filter(cell => JSON.stringify(cell) !== JSON.stringify(centerSelection)))
+            // alterData("selections", selections.filter(sel => 
+            // !pattern.some(patternCell => 
+            // isEqualSelection(new Selection(patternCell.row + centerSelection.row, patternCell.col + centerSelection.col), sel))) )
         } else if (editMode == 'draw') {
-            alterData("selections", selections.concat(...pattern.map(sel => new Selection(sel.row + centerSelection.row, sel.col + centerSelection.col))))
+            alterData("selections", selections.concat(centerSelection))
+            // alterData("selections", selections.concat(...pattern.map(sel => new Selection(sel.row + centerSelection.row, sel.col + centerSelection.col))))
         }
     }
 
@@ -404,7 +405,6 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         const rowOffset = (currentY - lastY) / getCellSize();
         const newLocation = new Area(selectedArea.row + rowOffset, selectedArea.col + colOffset, selectedArea.width, selectedArea.height)
         setSelectedArea(newLocation)
-        console.log(selections.filter(sel => sel.isSelected).length)
         alterData("selections", boardData.selections.map(sel => sel.isSelected ? new Selection(sel.row + newLocation.row - selectedArea.row, sel.col + newLocation.col - selectedArea.col) : new Selection(sel.row, sel.col)) )
         lastMousePosition.current = getMousePositionInCanvas(event)
     }
@@ -433,10 +433,10 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         const { view } = boardData
         const currentBox = (row, col, width = 1, height = 1) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize * width, cellSize * height]
 
-        displayedSelections.current.forEach(selection => context.fillRect(...currentBox(selection.row, selection.col)) )
+        JSON.parse(displayedSelections.current).forEach(selection => context.fillRect(...currentBox(selection.row, selection.col)) )
 
         context.beginPath()
-        if (!boardData.playback.enabled) {
+        if (!boardData.playback.enabled && drawGrid) {
             for (let row = rowStart - 1; row < rowEnd + 1; row++) {
                 if (row == 0) {
                     context.stroke();
@@ -483,7 +483,6 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         const { pattern, view } = boardData
         const hoveredCell = getHoveredCell(event)
         if (boardData.playback.enabled || isEqualSelection(lastHoveredCell.current, hoveredCell)) return
-        lastHoveredCell.current = hoveredCell
         const context = getContext()
         context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
         draw()
@@ -509,38 +508,6 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         context.globalAlpha = 1;
     }
 
-    function interpolate(duration) {
-        
-    }
-    
-    // const fitGap = 5
-    // function screenFit() {
-    //     if (isEmpty()) return
-    
-    //     const sortedHorizontally = displayedSelections.current.sort((first, second) => first.col - second.col)
-    //     const sortedVertically = displayedSelections.current.sort((first, second) => first.row - second.row)
-    //     const cellHorizontalSpan = Math.abs(sortedHorizontally?.[0].col - sortedHorizontally?.[sortedHorizontally.length - 1].col);
-    //     const cellVerticalSpan = Math.abs(sortedVertically?.[0].row - sortedVertically?.[sortedVertically.length - 1].row);
-    
-    //     const desiredCellSize = Math.min(getCanvasBounds().width, getCanvasBounds().height) / Math.max(cellHorizontalSpan, cellVerticalSpan) - fitGap
-    //     console.log('desired cell size: ', desiredCellSize)
-    
-    //     const newZoom = Math.max(MIN_ZOOM, Math.min(2, getZoomfromCellSize(desiredCellSize)))
-    //     console.log("new zoom: ", newZoom)
-    
-    //     const medianPosition = {
-    //         row: displayedSelections.current[Math.floor(displayedSelections.current.length / 2)].row,
-    //         col: displayedSelections.current[Math.floor(displayedSelections.current.length / 2)].col
-    //     }
-    
-    //     alterData('view', {...boardData.view, coordinates: {
-    //         row: medianPosition.row - getCellsVerticallyAcrossScreen() / 2,
-    //         col: medianPosition.col - getCellsHorizontallyAcrossScreen() / 2
-    //         },
-    //         zoom: newZoom
-    //     })
-    // }
-
 
     const observer = useRef(new ResizeObserver(() => {resizeCanvas(); draw()}));
     useEffect(() => {
@@ -561,12 +528,11 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         isAnimating.current = boardData.playback.enabled
         
         if (boardData.playback.enabled) {
-            alterData('selections', removeDuplicates(cloneSelections(boardData.selections)))
+            alterData('selections', removeDuplicates(boardData.selections.map(cell => Selection.clone(cell))))
         } else {
-            lastGeneration.current = []
+            lastGeneration.current = ""
             frameRequested.current = false;
-            console.log("boardData selections: ", boardData.selections)
-            setDisplayedSelections(boardData.selections)
+            setDisplayedSelections(JSON.stringify(boardData.selections))
             setCurrentGeneration(0)
 
             if (boardData.view.zoom < MIN_EDIT_ZOOM) {
@@ -585,36 +551,38 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
 
       
       useEffect(() => {
-          function getNextTick() {
-              if (isAnimating.current) {
-                  if (Date.now() - lastTick.current > getMillisecondsPerTick()) {
+          requestAnimationFrame( () => {
+            function getNextTick() {
+                if (isAnimating.current) {
+                    if (Date.now() - lastTick.current > getMillisecondsPerTick()) {
+                        const nextGeneration = renders.current.getNextFrame(displayedSelections.current) || ( JSON.stringify((getNextGeneration(JSON.parse(displayedSelections.current), selectionSet.current))) );
+                        lastTick.current = Date.now()
+                        lastGeneration.current = displayedSelections.current
+                        if (isAnimating.current) {
+                            frameRequested.current = false;
+                            setDisplayedSelections(nextGeneration)
+                            setCurrentGeneration(curr => curr + 1)
+                        }
+                    } else {
+                        setTimeout(() => getNextTick(), getMillisecondsPerTick() - (Date.now() - lastTick.current))
+                    }
+                }
+            }
+            
+            if (!frameRequested.current && boardData.playback.enabled) {
+                frameRequested.current = true;
+                getNextTick()
+            } else {
+                console.log('get next tick not called', !frameRequested.current, boardData.playback.enabled)
+            }
+         }
+        )
 
-                      const nextGeneration = isRendered.current && loadedRender.current.hasGeneration(currentGeneration) ? loadedRender.current.generation(currentGeneration) : getNextGeneration(displayedSelections.current, selectionSet.current);
-                      lastTick.current = Date.now()
-                      lastGeneration.current = cloneSelections(displayedSelections.current)
-                      if (isAnimating.current) {
-                          frameRequested.current = false;
-                          setDisplayedSelections(getSortedSelections(nextGeneration))
-                          setCurrentGeneration(curr => curr + 1)
-                      }
-                  } else {
-                      setTimeout(() => getNextTick(), getMillisecondsPerTick() - (Date.now() - lastTick.current))
-                  }
-              }
-          }
-          
-        if (!frameRequested.current && boardData.playback.enabled) {
-            frameRequested.current = true;
-            getNextTick()
-        } else {
-            console.log('get next tick not called', !frameRequested.current, boardData.playback.enabled)
-        }
-
-    }, [boardData.playback.enabled, displayedSelections.current])
+    }, [boardData.playback.enabled, currentGeneration])
 
     useEffect(() => {
         if (!boardData.playback.enabled)
-            setDisplayedSelections(selections)
+            setDisplayedSelections(JSON.stringify(boardData.selections))
     }, [boardData.selections])
 
     const keyEvents = [
@@ -675,7 +643,7 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
     // }
 
     function keyListener(keyEvent) {
-        console.log(keyEvent.key)
+        // console.log(keyEvent.key)
         keyEvents.forEach(binding => binding.testAndRunDown(keyEvent))
     }
 
@@ -736,9 +704,9 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
             mousePan(mouseEvent); 
             mouseZoom(mouseEvent); 
         }
-        
         selectingArea(mouseEvent);
         moveSelectedArea(mouseEvent);
+        lastHoveredCell.current = getHoveredCell(mouseEvent)
     }
 
 
@@ -757,7 +725,7 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
     }
     
     const onMouseUp = (event) => {
-        console.log("MOUSE UP");
+        // console.log("MOUSE UP");
         if (boardData.editMode == 'draw') {
             switch (brush.type) {
                 case "line": drawLine(brush.extra.lineStart, getHoveredCell(event)); break;
@@ -780,11 +748,70 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
         randomized.push(new Selection(rowStart + Math.round(Math.random() * rowEnd), colStart + Math.round(Math.random() * colEnd)))
       }
       alterData('selections', randomized)
+    }   
+
+    function requestRender(startingJSON, generationCount = 0) {
+        setRenderStatus(current => {
+            return {
+                ...current,
+                queued: true,
+                requested: {
+                    ...current.requested,
+                    currentGeneration: startingJSON,
+                    generationCount: generationCount
+                }
+            }
+        })
     }
+
+
+    const lastRenderTime = useRef(currentTime());
+    const timesBetweenFrames = useRef([])
+    useEffect( () => {
+        requestAnimationFrame( () => {
+        if (renderStatus.queued == false ||
+            renderStatus.requested.generationCount <= 0 || 
+            renderStatus.percentage >= 100 ||
+            renderStatus.requested.currentGeneration in renders.current.frames ||
+            renderStatus.requested.currentGenerationCount > renderStatus.requested.generationCount) {
+            setRenderStatus(initialRenderStatus)
+            setShowingRenderPrompt(false)
+            timesBetweenFrames.current = []
+            return
+        } else {
+            if (renderStatus.requested.currentGenerationCount === 0) {
+                renders.current.starters.push(renderStatus.requested.currentGeneration)
+                lastRenderTime.current = currentTime()
+            }
+
+            timesBetweenFrames.current.push( ( currentTime() - lastRenderTime.current ) * 1000 )
+            console.log(timesBetweenFrames.current)
+            console.log("recorded time: ", millisecondsToTimeString(timesBetweenFrames.current.reduce((acc, curr) => acc + curr, 0)))
+
+            const nextGenerationJSON = JSON.stringify( (getNextGeneration(JSON.parse(renderStatus.requested.currentGeneration)) ) )
+            renders.current.frames[renderStatus.requested.currentGeneration] = nextGenerationJSON
+            const currentPercentage = Math.round( ( (renderStatus.requested.currentGenerationCount + 1)  / renderStatus.requested.generationCount) * 100)
+            lastRenderTime.current = currentTime()
+            setTimeout( () => setRenderStatus( current => { return {...current,
+                percentage: currentPercentage,
+                timeToCompletion: average(timesBetweenFrames.current) * (current.requested.generationCount - current.requested.currentGenerationCount) * 2,
+                requested: {
+                    ...current.requested,
+                    currentGenerationCount: current.requested.currentGenerationCount + 1,
+                    currentGeneration: nextGenerationJSON
+                    }
+
+                    }
+                }
+            ), AFK ? 0 : 10);
+        }  } )
+
+    }, [renderStatus] )
 
 
     const [showBoardDataDisplay, setShowBoardDataDisplay] = useState(false)
     const [showingDrawingOptions, setShowingDrawingOptions] = useState(false)
+    const [showingErasingOptions, setShowingErasingOptions] = useState(false)
 
     let cursor = 'auto'
     switch (editMode) {
@@ -833,18 +860,14 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
                         setShowingRenderPrompt(false); return;
                     }
 
-                    const similarRenders = renders.current.filter(render => equalSelectionLists(selections, render.startingSelections))
-                    if (similarRenders.length == 0) {
-                        renders.current.push(getRender(selections, requestedGenerations))
-                        console.log(renders.current)
-                    } else if (similarRenders.some(render => render.renders.length > requestedGenerations)) {
-                        console.log("Already Rendered")
-                    } else {
-                        renders.current = renders.current.filter(render => !equalSelectionLists(render.startingSelections, selections)).concat(getRender(selections, requestedGenerations))
-                    }
-
-                    setShowingRenderPrompt(false)
+                    requestRender(JSON.stringify(boardData.selections), requestedGenerations)
                     }}> Submit </button>
+
+                    { renderStatus.percentage > 0 && <div className='progress-bar'>
+                        <span className='progress-bar-percentage'> { renderStatus.percentage }% </span> 
+                        <span className='progress-bar-ETA'> { millisecondsToTimeString(renderStatus.timeToCompletion) } </span> 
+                        <div className="progress-bar-status" style={{width: `${renderStatus.percentage}%` }}/> 
+                        </div>}
             </div> }
         
         {showingToolBar && <div className='game-toolbar flex-row'>
@@ -870,7 +893,16 @@ export const GameBoard = ( { boardData, dataDispatch, editable = true, closable 
 
                 </div> }
             </div>
-            <button onClick={() => editMode != 'erase' ? alterData('editMode', 'erase') : ''} className={`game-tool ${boardData.editMode == 'erase' ? 'selected' : 'unselected'}`}> <FaEraser /> <ToolTip> 2: Erase </ToolTip> </button>
+
+            <div className="erasing-options" onMouseLeave={() => setShowingErasingOptions(false)}>
+                <button onClick={() => editMode != 'erase' ? alterData('editMode', 'erase') : ''} className={`game-tool ${boardData.editMode == 'erase' ? 'selected' : 'unselected'}`} onMouseEnter={() => setShowingErasingOptions(true)}> <FaEraser /> <ToolTip> 2: Erase </ToolTip> </button>
+                {showingErasingOptions && 
+                <div className="erasing-options-menu">
+                    <h2> Brush Size: </h2> 
+                    <input type="number" value={brush.size} onChange={(event) => setBrush({...brush, size: Number(event.target.value)})} />
+                </div> }
+            </div>
+
             <button onClick={() => editMode != 'pan' ? alterData('editMode', 'pan') : ''} className={`game-tool ${boardData.editMode == 'pan' ? 'selected' : 'unselected'}`}> <FaArrowsAlt /> <ToolTip> 3 (Shift + Drag): Pan </ToolTip> </button>
             <button onClick={() => editMode != 'zoom' ? alterData('editMode', 'zoom') : ''} className={`game-tool ${boardData.editMode == 'zoom' ? 'selected' : 'unselected'}`}>  <FaSearch /> <ToolTip> 4 (Ctrl + Drag): Zoom </ToolTip> </button>
             <button onClick={() => editMode != 'select' ? alterData('editMode', 'select') : ''} className={`game-tool ${boardData.editMode == 'select' ? 'selected' : 'unselected'}`}> <BsBoundingBox /> <ToolTip> 5 (Alt + Drag): Select </ToolTip> </button>

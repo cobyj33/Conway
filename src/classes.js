@@ -16,10 +16,6 @@ export class Selection {
       return new Selection(row, col, type)
     }
 
-    toString() {
-      return JSON.stringify(this)
-    }
-
     static StringToSelection(string) {
       const {row, col, type} = JSON.parse(string);
       return new Selection(Number(row), Number(col), type);
@@ -235,24 +231,25 @@ export class BoardData {
     }
   }
 
-  let renderID = 0;
-  export class Render {
-    constructor(startingSelections = [], renders = []) {
-      this.id = ++renderID;
-      this.renders = renders
-      this.startingSelections = startingSelections.map(sel => Selection.clone(sel))
-    }
+  // let renderID = 0;
+  // export class Render {
+  //   constructor(startingSelections = [], renders = []) {
+  //     this.id = ++renderID;
+  //     this.renders = renders
+  //     this.startingSelections = startingSelections.map(sel => Selection.clone(sel))
+  //   }
  
-    generation(num) {
-      return num < this.renders.length ? this.renders[num] : this.renders[this.renders.length - 1]
-    }
+  //   generation(num) {
+  //     return num < this.renders.length ? this.renders[num] : this.renders[this.renders.length - 1]
+  //   }
 
-    hasGeneration(num) {
-      return num < this.renders.length;
-    }
-  } 
-  class User {
-    constructor(id) {
+  //   hasGeneration(num) {
+  //     return num < this.renders.length;
+  //   }
+  // } 
+
+  // class User {
+  //   constructor(id) {
       
-    }
-  }
+  //   }
+  // }

@@ -74,7 +74,7 @@
     border: none;
   }
 
-  .drawing-options-menu {
+  .drawing-options-menu, .erasing-options-menu {
     position: absolute;
     top: 100%;
 
@@ -95,4 +95,37 @@
     transform: translate(-50%, -50%);
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 5px;
+    
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .progress-bar {
+    position: relative;
+    width: 100%;
+    height: 20%;
+    background: none;
+    border-radius: 5px;
+    padding: 5px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .progress-bar-status {
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background-color: green;
+  }
+
+  .progress-bar-percentage {
+    z-index: 1;
   }
