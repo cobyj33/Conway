@@ -1,10 +1,11 @@
 import { cloneDeep } from 'lodash'
 import { average } from './functions'
 export class Selection {
-    constructor(row, col, type = 'cell') {
+    constructor(row, col, type = 'cell', isSelected = false) {
       this.row = row
       this.col = col
       this.type = type
+      this.isSelected = isSelected
     }
 
     static distanceBetween(first, second) {
@@ -12,8 +13,8 @@ export class Selection {
     } 
 
     static clone(selection) {
-      const {row, col, type} = selection
-      return new Selection(row, col, type)
+      const {row, col, type, isSelected} = selection
+      return new Selection(row, col, type, isSelected)
     }
 
     static StringToSelection(string) {
@@ -51,11 +52,14 @@ export class Selection {
         return [this.row, this.col, this.width, this.height]
     }
 
-    static corners(...points) {
+    static corners(points) {
       // const [first, second, third, fourth] = points
-      if (points.length < 2) {
+      if (points.length < 1) {
         console.log('not all corners available')
         return
+      } else if (points.length === 1) {
+        const point = points[0]
+        return new Area(point.row, point.col, 1, 1)
       }
 
       const row = Math.min(...points.map(point => point.row))
@@ -131,7 +135,7 @@ export class BoardData {
   
       this.selections = []
       this.walls = []
-      this.pattern = [{row: 0, col: 0}];
+      this.pattern = new Pattern({ selections: [{row: 0, col: 0}], name: "Pixel Pattern" });
       this.playback = {
         enabled: false,
         paused: false,
@@ -151,6 +155,15 @@ export class BoardData {
         },
         zoom: 1
       }
+
+      this.brush = {
+        type: 'pixel',
+        size: 1,
+        paint: 'cell',
+        extra: {
+            lineStart: undefined
+        }
+      }
   
       this.settings = {
         tickSpeed: 5,
@@ -163,7 +176,7 @@ export class BoardData {
       if (previousData) {
         const clonedData = cloneDeep(previousData)
         Object.keys(clonedData).forEach(prop => {
-          if (prop in currentData) {
+          if (prop in currentData && prop !== "id") {
             currentData[prop] = clonedData[prop]
           }
         })
@@ -219,10 +232,11 @@ export class BoardData {
 
 
       if (selections.length == 0) {
-        this.selections = selections;
+        this.selections = selections.map(cell => Selection.clone(cell));
       } else {
-        const centerOfSelections = new Selection(average(selections.map(sel => sel.row)), average(selections.map(sel => sel.col)))
-        this.selections = selections.map(sel => new Selection(sel.row - centerOfSelections.row, sel.col - centerOfSelections.col))
+        const averageVerticalDistanceToCenter = Math.round(average(selections.map(cell => cell.row)))
+        const averageHorizontalDistanceToCenter = Math.round(average(selections.map(cell => cell.col)))
+        this.selections = selections.map(cell => new Selection(cell.row - averageVerticalDistanceToCenter, cell.col - averageHorizontalDistanceToCenter, cell?.type, cell?.isSelected))
       }
     }
 
@@ -231,25 +245,22 @@ export class BoardData {
     }
   }
 
-  // let renderID = 0;
-  // export class Render {
-  //   constructor(startingSelections = [], renders = []) {
-  //     this.id = ++renderID;
-  //     this.renders = renders
-  //     this.startingSelections = startingSelections.map(sel => Selection.clone(sel))
-  //   }
+  let renderID = 0;
+  export class Render {
+    constructor(startingSelectionsJSON = "", frames = {}) {
+      this.id = ++renderID;
+      this.frames = frames
+      this.startingSelectionsJSON = startingSelectionsJSON
+    }
+
+    get numOfFrames() {
+      return Object.keys(this.frames).length
+    }
  
-  //   generation(num) {
-  //     return num < this.renders.length ? this.renders[num] : this.renders[this.renders.length - 1]
-  //   }
+  } 
 
-  //   hasGeneration(num) {
-  //     return num < this.renders.length;
-  //   }
-  // } 
-
-  // class User {
-  //   constructor(id) {
+  class User {
+    constructor(id) {
       
-  //   }
-  // }
+    }
+  }

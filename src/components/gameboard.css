@@ -74,7 +74,7 @@
     border: none;
   }
 
-  .drawing-options-menu, .erasing-options-menu {
+  .drawing-options-menu, .erasing-options-menu, .pattern-options-menu {
     position: absolute;
     top: 100%;
 
@@ -86,6 +86,14 @@
     flex-direction: row;
     /* justify-content: center;
     align-items: center; */
+  }
+
+  .pattern-option {
+    background-color: darkslategray;
+  }
+
+  .pattern-option.selected {
+    background-color: green;
   }
 
   .render-prompt {

@@ -3,8 +3,8 @@ import { Sidebar } from './components/Sidebar'
 import './app.css'
 import { GameBoard } from './components/GameBoard'
 import { BoardData, Pattern, Selection } from './classes'
-import { PatternMenu } from './components/PatternMenu'
-import { boardStatesReducer, getBoardGridStyle, selectionListToString, getNextGeneration} from './functions'
+import { CreationMenu } from './components/CreationMenu'
+import { boardStatesReducer, patternsReducer, getBoardGridStyle, selectionListToString, getNextGeneration} from './functions'
 import icon from "./assets/Conway Logo.png"
 const patterns = require("./assets/patterns.json")
 .map(patternData => new Pattern(patternData))
@@ -17,6 +17,7 @@ export const ThemeContext = createContext();
 export const PatternContext = createContext();
 export const BoardContext = createContext();
 export const RenderContext = createContext();
+export const AlertContext = createContext();
 
 export let AFK = false;
 const TIME_TO_AFK_MODE = 1000;
@@ -32,11 +33,23 @@ window.addEventListener("mousedown", onInput)
 window.addEventListener("keydown", onInput)
 window.addEventListener("keyup", onInput)
 
+export let currentMousePosition = { x: 0, y: 0 }
+window.addEventListener("mousemove", (mouseEvent) => {
+  currentMousePosition = { x: mouseEvent.clientX, y: mouseEvent.clientY }
+})
+
+
 export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
-    // const [showingPatternMenu, setShowingPatternMenu] = useState(false);
+    // const [showingCreationMenu, setShowingCreationMenu] = useState(false);
     const [boardDatas, dataDispatch] = useReducer(boardStatesReducer, [new BoardData()])
+    const [savedPatterns, setSavedPatterns] = useReducer(patternsReducer, patterns);
+    const [currentAlert, setCurrentAlert] = useState('')
+    const [theme, setTheme] = useState('')
+    const boardGrid = getBoardGridStyle(boardDatas.length)
+    const [mainMenu, setMainMenu] = useState("game");
+
     const renders = useRef({
       starters: [],
       frames: {
@@ -71,6 +84,20 @@ export const App = () => {
         return count;
       },
 
+      getFrames(startingSelectionsJSON) {
+        const frames = []
+        let currentString = startingSelectionsJSON
+        const passedThrough = new Set([])
+
+        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
+          passedThrough.add(currentString)
+          frames.push(currentString)
+          currentString = this.frames[currentString]
+        }
+
+        return frames;
+      },
+
       render(startingSelectionsJSON, generations = 0) {
         console.log("generations: ", generations)
         if (generations <= 0) {
@@ -101,12 +128,6 @@ export const App = () => {
       }
     });
 
-    const [savedPatterns, setSavedPatterns] = useState(patterns);
-    const [theme, setTheme] = useState('')
-    const boardGrid = getBoardGridStyle(boardDatas.length)
-
-    const [mainMenu, setMainMenu] = useState("game");
-    
     function getMenu(menu) {
 
       const gameMenu = boardDatas.length > 0 ? <div className='game-area' style={boardGrid}> 
@@ -122,12 +143,17 @@ export const App = () => {
 
       switch(menu) {
         case "game": return gameMenu;
-        case "pattern": return <PatternMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setMainMenu("game")}/>;
+        case "pattern": return <CreationMenu patterns={savedPatterns} setPatterns={setSavedPatterns} close={() => setMainMenu("game")}/>;
         default: return gameMenu;
       }
     }
 
-    
+    const lastAlertTimeout = useRef(null)
+    function sendAlert(children, duration = 1000) {
+      if (lastAlertTimeout.current !== null) {
+        
+      }
+    }
 
     
 
@@ -136,6 +162,7 @@ export const App = () => {
       <ThemeContext.Provider value={[theme, setTheme]}>
         <BoardContext.Provider value={[boardDatas, dataDispatch]} >
           <PatternContext.Provider value={[savedPatterns, setSavedPatterns]} >
+            <AlertContext.Provider value={sendAlert}>
             
             <RenderContext.Provider value={renders}>
               <div className='main-menu'>
@@ -159,9 +186,9 @@ export const App = () => {
 
                   </div>} */}
 
-                <button className={`add-board-button`} onClick={() => dataDispatch({type: 'add'})}> Add Board </button>
+                <button className={`add-board-button`} onClick={() => dataDispatch({type: 'add', boardData: new BoardData()})}> Add Board </button>
                 <button className={`game-menu-button ${mainMenu == "game" ? 'opened' : ''}`} onClick={() => setMainMenu('game')}> Game Menu </button>
-                <button className={`pattern-menu-button ${mainMenu == "pattern" ? 'opened' : ''}`} onClick={() => setMainMenu('pattern')}> Pattern Menu </button>
+                <button className={`creation-menu-button ${mainMenu == "pattern" ? 'opened' : ''}`} onClick={() => setMainMenu('pattern')}> Creation Menu </button>
 
                 <button className={`about-button ${aboutMenu ? 'opened' : ''}`} onClick={() => setAboutMenu(!aboutMenu)}> About </button>
                 { aboutMenu && <div className='about'>
@@ -176,9 +203,10 @@ export const App = () => {
                 <a href="https://www.github.com/cobyj33/Conway" target="_blank"> <button> Project Link </button> </a>
                 <a href="https://www.github.com/cobyj33/" target="_blank"> <button> Other Creations </button> </a>
             </Sidebar>
+
             
 
-
+            </AlertContext.Provider>
           </PatternContext.Provider>
         </BoardContext.Provider>
       </ThemeContext.Provider>

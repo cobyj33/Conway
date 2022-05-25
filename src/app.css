@@ -24,6 +24,8 @@ html, body, body > div {
 * {
   color: white;
   user-select: none;
+  font-family: "IM Fell Great Primer", "Times New Roman", "serif";
+  text-align: center;
 }
 
 button {

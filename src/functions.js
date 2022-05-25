@@ -1,6 +1,6 @@
 
-import { cloneDeep, remove } from "lodash";
-import { Area, BoardData, Render, Selection } from "./classes.js";
+import { cloneDeep } from "lodash";
+import { Area, BoardData, Selection } from "./classes.js";
 
 const audioContext = new AudioContext()
 export function currentTime() { return audioContext.currentTime }
@@ -95,6 +95,41 @@ export function currentTime() { return audioContext.currentTime }
     return secondList.every(sel => firstSet.has(JSON.stringify(sel)))
   }
 
+  export function getRenderView(rendersRef, startingSelectionsJSON) {
+    const frames = rendersRef.current.getFrames(startingSelectionsJSON)
+    if (frames.length === 0) return null
+    const firstFrame = JSON.parse(frames[0])
+    let [minRow, minCol, maxRow, maxCol] = [Math.min(...firstFrame.map(cell => cell.row)),
+      Math.min(...firstFrame.map(cell => cell.col)),
+      Math.max(...firstFrame.map(cell => cell.row)),
+      Math.max(...firstFrame.map(cell => cell.col))];
+
+    console.log(minRow, minCol, maxRow, maxCol)
+    frames.forEach(frame => {
+      const data = JSON.parse(frame)
+      console.log("data: ", data)
+      const rows = data.map(cell => cell.row)
+      const cols = data.map(cell => cell.col)
+      minRow = Math.min(minRow, Math.min(...rows))
+      minCol = Math.min(minCol, Math.min(...cols))
+      maxRow = Math.max(maxRow, Math.max(...rows))
+      maxCol = Math.max(maxCol, Math.max(...cols))
+    })
+
+    return Area.corners([{row: minRow, col: minCol}, {row: maxRow, col: maxCol}])
+  }
+
+  export function translateSelectionsAroundPoint(selections, selection) {
+    const patternArea = Area.corners(selections);
+    const verticalTranslation = selection.row - patternArea.center.row
+    const horizontalTranslation = selection.col - patternArea.center.col
+    return selections.map(cell => new Selection(cell.row + verticalTranslation, cell.col + horizontalTranslation) )
+  }
+
+  export function translateSelections(selections, rows, cols) {
+    return selections.map(cell => new Selection(cell.row + rows, cell.col + cols))
+  }
+
 
 export function nextLargestPerfectSquare(num) {
     return (Math.pow(Math.ceil(Math.sqrt(num)) , 2))
@@ -178,19 +213,25 @@ export function millisecondsToTimeString(milliseconds) {
 }
 
 export function boardStatesReducer(state, action) {
-    const {type, id, request} = action;
+    const {type, id, request, all = false} = action;
     const chosenBoard = state.filter(board => board.id === id)?.[0];
     const newBoard = cloneDeep(chosenBoard);
     switch (type) {
       case "remove":
-        if (!id) {
+        if (id == null && !all) {
           console.log("cannot remove a board with no id");
           return state;
         }
-        return state.filter(board => board.id !== id)
+
+        
+        return all ? [] : state.filter(board => board.id !== id)
       case "add":
         const { boardData } = action;
-        return boardData == null ? state.concat(new BoardData()) : state.concat(new BoardData(boardData))
+        if (boardData == null) {
+          console.log("cannot add null board")
+          return state
+        }
+        return state.concat(boardData).sort((first, second) => first.id - second.id)
       case "alter":
         if (!chosenBoard) return state
           const {accessor = "", newValue} = request
@@ -288,6 +329,21 @@ export function boardStatesReducer(state, action) {
         console.log("No valid selected dispatch type: ", type)
         return state
       }
+  }
+
+  export function patternsReducer(state, action) {
+    const { type } = action;
+    switch (type) {
+      case "add": {
+
+      } break;
+      case "delete": {
+
+      } break;
+      case "edit": {
+
+      } break;
+    }
   }
 
 export function binarySearch(list, target) {
