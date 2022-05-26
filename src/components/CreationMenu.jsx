@@ -8,16 +8,9 @@ import { ToolTip } from './ToolTip/ToolTip';
 import { PatternDisplay } from './PatternDisplay';
 import { RenderDisplay } from './RenderDisplay';
 
-// let patterns = [new Pattern({ selections: [{row: 0, col: 0}] })]
-
-// fetch('./patterns.json')
-// .then(response => response.json())
-// .then(data => data.map(pattern => new Pattern({ selections: pattern })))
-// .then(array => patterns = array)
-// .catch(error => console.error(error))
 
 export const CreationMenu = ({ close }) => {
-  const [patterns, setPatterns] = useContext(PatternContext)
+  const [patterns, savedPatternsDispatch] = useContext(PatternContext)
   const renders = useContext(RenderContext)
   const [position, setPosition] = useState({left: 100, top: 100});
   const [currentMenu, setCurrentMenu] = useState('My Patterns');

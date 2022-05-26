@@ -1,6 +1,6 @@
-import { useContext, useReducer } from "react";
-import { BoardData } from "../classes";
-import { boardReducer } from "../functions";
+import { useContext, useMemo, useReducer } from "react";
+import { Area, BoardData, Selection } from "../classes";
+import { boardReducer, getPatternView } from "../functions";
 import { GameBoard } from "./GameBoard";
 import { BoardContext, PatternContext } from "../App";
 import { FaChevronCircleDown } from "react-icons/fa";
@@ -10,19 +10,21 @@ import "./creationmenu.css"
 export const PatternDisplay = ({ pattern }) => {
     const [patterns, setPatterns] = useContext(PatternContext)
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
-    const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: pattern.selections}));
+    const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData( { selections: pattern.selections.map(cell => Selection.clone(cell)) } ));
+    const initialBoardView = useMemo( () => getPatternView(pattern), [pattern])
+
+
     
     return (
       <div className="pattern-display">
         <div className='board-container'>
-          <GameBoard boardData={boardData} dataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} /> 
+          <GameBoard boardData={boardData} boardDataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} initialViewArea={initialBoardView} /> 
         </div>
   
         <div className='pattern-display-information'> 
-          <div className='pattern-display-main-data'>
+            <div className='pattern-display-main-data'>
             <span className="pattern-name pattern-data"> Name: {pattern.name} </span>
             <span className="pattern-count pattern-data"> Count: {pattern.count} </span>
-            {/* Count: { pattern.count } */}
           </div>
           <div className='pattern-display-meta-data'> 
             <span className="pattern-creator pattern-data"> Creator: {pattern.name} </span>
@@ -34,7 +36,8 @@ export const PatternDisplay = ({ pattern }) => {
           <div className='pattern-display-interact'>
             <button> Edit </button>
             <button> Preview </button>
-            <button onClick={() => gameBoards.forEach(board => { 
+            <button onClick={() => console.log(JSON.stringify(pattern))}> Log JSON </button>
+            <button onClick={() => gameBoards.forEach( board => { 
               gameBoardsDispatch({type: 'alter', id: board.id, request: { accessor: 'brush.type', newValue: 'pattern' }})
               gameBoardsDispatch({ type: "alter", id: board.id, request: { accessor: 'pattern', newValue: pattern } })} ) }> Select As Brush </button>
               <button onClick={() => setPatterns(patterns.filter(pat => JSON.stringify(pat) !== JSON.stringify(pattern)))}> Delete </button>

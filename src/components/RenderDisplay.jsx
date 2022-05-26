@@ -39,7 +39,7 @@ export const RenderDisplay = ({ startingSelectionsJSON }) => {
     return (
       <div className="render-display">
         <div className="board-container">
-          <GameBoard boardData={boardData} dataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} initialViewArea={initialBoardDataView} />
+          <GameBoard boardData={boardData} boardDataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} initialViewArea={initialBoardDataView} />
         </div>
   
         <div className='render-display-information'> 

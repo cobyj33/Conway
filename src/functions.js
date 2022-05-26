@@ -1,8 +1,9 @@
 
 import { cloneDeep } from "lodash";
-import { Area, BoardData, Selection } from "./classes.js";
+import { Area, Selection } from "./classes.js";
 
 const audioContext = new AudioContext()
+const VIEW_PADDING = 10;
 export function currentTime() { return audioContext.currentTime }
 
   export function getAdjacentNeighbors(selection) {
@@ -96,27 +97,39 @@ export function currentTime() { return audioContext.currentTime }
   }
 
   export function getRenderView(rendersRef, startingSelectionsJSON) {
-    const frames = rendersRef.current.getFrames(startingSelectionsJSON)
-    if (frames.length === 0) return null
-    const firstFrame = JSON.parse(frames[0])
-    let [minRow, minCol, maxRow, maxCol] = [Math.min(...firstFrame.map(cell => cell.row)),
-      Math.min(...firstFrame.map(cell => cell.col)),
-      Math.max(...firstFrame.map(cell => cell.row)),
-      Math.max(...firstFrame.map(cell => cell.col))];
+    // const frames = rendersRef.current.getFrames(startingSelectionsJSON)
+    // if (frames.length === 0) return null
+    // const firstFrame = JSON.parse(frames[0])
+    // let [minRow, minCol, maxRow, maxCol] = [Math.min(...firstFrame.map(cell => cell.row)),
+    //   Math.min(...firstFrame.map(cell => cell.col)),
+    //   Math.max(...firstFrame.map(cell => cell.row)),
+    //   Math.max(...firstFrame.map(cell => cell.col))];
 
-    console.log(minRow, minCol, maxRow, maxCol)
-    frames.forEach(frame => {
-      const data = JSON.parse(frame)
-      console.log("data: ", data)
-      const rows = data.map(cell => cell.row)
-      const cols = data.map(cell => cell.col)
-      minRow = Math.min(minRow, Math.min(...rows))
-      minCol = Math.min(minCol, Math.min(...cols))
-      maxRow = Math.max(maxRow, Math.max(...rows))
-      maxCol = Math.max(maxCol, Math.max(...cols))
-    })
+    // console.log(minRow, minCol, maxRow, maxCol)
+    // frames.forEach(frame => {
+    //   const data = JSON.parse(frame)
+    //   console.log("data: ", data)
+    //   const rows = data.map(cell => cell.row)
+    //   const cols = data.map(cell => cell.col)
+    //   minRow = Math.min(minRow, Math.min(...rows))
+    //   minCol = Math.min(minCol, Math.min(...cols))
+    //   maxRow = Math.max(maxRow, Math.max(...rows))
+    //   maxCol = Math.max(maxCol, Math.max(...cols))
+    // })
 
-    return Area.corners([{row: minRow, col: minCol}, {row: maxRow, col: maxCol}])
+    // return Area.corners([{row: minRow, col: minCol}, {row: maxRow, col: maxCol}])
+    return getPatternView({ selections: JSON.parse(startingSelectionsJSON) })
+  }
+
+  export function getPatternView({ selections }) {
+    const initialArea = Area.corners(selections);
+    const { row, col, width, height } = initialArea;
+    return new Area(row - VIEW_PADDING, col - VIEW_PADDING, width + VIEW_PADDING, height + VIEW_PADDING)
+  }
+
+  export function rotateSelections90(selections) {
+    const centerPoint = Area.corners(selections).center;
+    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(-cell.col, cell.row)), centerPoint)  ;
   }
 
   export function translateSelectionsAroundPoint(selections, selection) {
@@ -178,21 +191,6 @@ function getRowRange(selectionList, index) {
   }
 
   return range;
-}
-
-const BOUNDS_PADDING = 10
-export function getPatternBounds(pattern) {
-  const { selections } = pattern;
-  const [top, bottom] = [selections[0].row, selections[selections.length - 1].row]
-  const [left, right] = [selections[0].col, selections[selections.length - 1].col]
-  return new Area(top - BOUNDS_PADDING, left - BOUNDS_PADDING, Math.abs(left - right) + (BOUNDS_PADDING * 2), Math.abs(top - bottom) +(BOUNDS_PADDING * 2))
-}
-
-export function getRenderBounds(render) {
-  const { renders } = render;
-  const [top, bottom] = [Math.min(renders.map(frame => frame?.[0]?.row)), Math.max(renders.map(frame => frame?.[frame.length - 1]?.row))]
-  const [left, right] = [Math.min(renders.map(frame => frame?.[0]?.col)), Math.max(renders.map(frame => frame?.[frame.length - 1]?.col))]
-  return new Area(top - BOUNDS_PADDING, left - BOUNDS_PADDING, Math.abs(left - right) + (BOUNDS_PADDING * 2), Math.abs(top - bottom) +(BOUNDS_PADDING * 2))
 }
 
 export function getBoardGridStyle(numOfBoards) {
@@ -332,17 +330,22 @@ export function boardStatesReducer(state, action) {
   }
 
   export function patternsReducer(state, action) {
-    const { type } = action;
+    const { type, id } = action;
     switch (type) {
       case "add": {
+        const { pattern } = action;
+        if (pattern == null) {
+          console.log("cannot add pattern with no pattern"); return state;
+        }
+        return state.concat(pattern)
+      }
+      // case "delete": {
 
-      } break;
-      case "delete": {
+      // } break;
+      // case "edit": {
 
-      } break;
-      case "edit": {
-
-      } break;
+      // } break;
+      default: console.log("cannot execute pattern action of type: ", type); return state;
     }
   }
 

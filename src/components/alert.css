@@ -3,7 +3,14 @@
     flex-direction: column;
     position: absolute;
 
-    top: 10px;
+    width: 0;
+    height: 0;
+    transition: width 0.1s, height 0.1s;
+    animation: alertPopIn;
+    animation-duration: 100ms;
+    animation-iteration-count: 1;
+
+    top: 0;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
@@ -12,6 +19,35 @@
     background-color: white;
     color: black;
 }
+
+@keyframes alertPopIn {
+    100% { width: auto;
+    height: auto; }
+}
+
+.alert * {
+    color: black;
+}
+
+.alert-top-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.alert-progress-bar {
+    justify-self: stretch;
+    background-color: black;
+}
+
+.alert-progress-status {
+    width: 0%;
+    max-width: 100%;
+    transition: width 0.15s;
+    background-color: green;
+}
+
 
 .alert-close {
     background-color: none;

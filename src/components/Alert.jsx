@@ -2,22 +2,27 @@ import React, { useEffect, useState } from 'react'
 import { FaWindowClose } from 'react-icons/fa'
 import "./alert.css"
 
-const useAlertState = (initialState = {message: '', duration: 0})  => {
-    const [alert, setAlert] = useState(initialState)
-    return [alert, setAlert]
-}
+export const Alert = ({ children, close = () => console.log("Close Callback Required"), startTime = Date.now(), duration = 1000 }) => {
+  const [time, setTime] = useState(startTime);
+  useEffect( () => {
+    const timer = setInterval( () => setTime(Date.now()), 20)
 
-
-export const Alert = ({ children, duration, close }) => {
-    
-    useEffect( () => {
-        setTimeout(() => close(), duration);
-    }, [])
+    return () => {
+      clearInterval(timer)
+    }
+  }, [])
 
   return (
     <div className="alert">
+      <div className="alert-top-bar">
+        <span> Notice: </span> 
         <button className="alert-close" onClick={close}> <FaWindowClose /> </button>
+      </div>
         { children }
+
+        <div className="alert-progress-bar">
+          <div className="alert-progress-status" style={{width: `${ time / (startTime + duration) * 100 }%`}}> </div>
+        </div>
     </div>
   )
 }

@@ -13,7 +13,7 @@ export const ToolTip = ({ children, expanded, trigger, target }) => {
     const getParent = () => target ? target.current : toolTipReference?.current?.parentElement;
     const open = () => setOpened(true);
     const close = () => { setOpened(false); setShowExtra(false); }
-    const updatePosition = (event) => setPosition({ left: event.clientX + 10, top: event.clientY + 10 });
+    const updatePosition = (event) => setPosition({ left: `${event.clientX + 10}px`, top: `${event.clientY + 10}px` });
     
     const displayExtra = (event) => { 
         if (event.key === "Shift" && openStatus.current && !event.repeat) { 
@@ -25,18 +25,20 @@ export const ToolTip = ({ children, expanded, trigger, target }) => {
 
 
     useEffect( () => {
-        getParent().addEventListener('mouseenter', open);
-        getParent().addEventListener('mouseleave', close);
-        getParent().addEventListener('mousemove', updatePosition);
+        const parent = getParent();
+        parent?.addEventListener('mouseenter', open);
+        parent?.addEventListener('mouseleave', close);
+        parent?.addEventListener('mousemove', updatePosition);
         window.addEventListener('keydown', displayExtra);
         window.addEventListener('keyup', hideExtra);
         
 
         return () => {
-            if (getParent()) {
-                getParent().removeEventListener('mouseenter', open);
-                getParent().removeEventListener('mouseleave', close);
-                getParent().removeEventListener('mousemove', updatePosition);
+            const parent = getParent();
+            if (parent != null) {
+                parent.removeEventListener('mouseenter', open);
+                parent.removeEventListener('mouseleave', close);
+                parent.removeEventListener('mousemove', updatePosition);
             };
             window.removeEventListener('keydown', displayExtra);
             window.removeEventListener('keyup', hideExtra);

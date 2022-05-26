@@ -10,20 +10,13 @@
 }
 
 .creation-menu {
-    /* position: fixed;
-    z-index: 100;
-    width: min(75vw, 75vh);
-    height: min(75vw, 75vh); */
     width: 100%;
     height: 100%;
     left: 0;
     top: 0;
-    /* aspect-ratio: 1; */
-    /* resize: both; */
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* justify-content: center; */
 
     background-color: rgb(50, 50, 50);
     border-bottom: 2px solid black;
@@ -67,15 +60,23 @@
 }
 
 .pattern-display .board-container, .render-display .board-container {
+    position: relative;
     flex-grow: 2;
     flex-shrink: 2;
-    aspect-ratio: 1;
     flex-basis: 0px;
+    background-color: red;
+}
+
+.pattern-display .board-container .game-board, .render-display .board-container .game-board {
+    position: absolute;
 }
 
 .pattern-display-information, .render-display-information {
-    flex-grow: 1;
+    flex-grow: 2;
     flex-shrink: 1;
+    flex-basis: 0px;
+
+
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -90,7 +91,6 @@
 }
 
 .menu-choices {
-
     display: flex;
     flex-direction: row;
     justify-content: space-evenly;

@@ -1,5 +1,5 @@
 import { cloneDeep } from 'lodash'
-import { average } from './functions'
+import { average, getSortedSelections } from './functions'
 export class Selection {
     constructor(row, col, type = 'cell', isSelected = false) {
       this.row = row
@@ -67,19 +67,22 @@ export class Selection {
       const width = Math.max(...points.map(point => Math.abs(col - point.col))) + 1
       const height = Math.max(...points.map(point => Math.abs(row - point.row))) + 1
 
-      console.log(row, col, width, height)
-      console.log(points);
       return new Area(row, col, width, height)
     }
   
-    containsArea({row, col, width = 1, height = 1}) {
+    intersectsOrContains({row, col, width = 1, height = 1}) {
         if (this.width == 0 || this.height == 0) return false
-        
         return ((this.row <= row && this.row + this.height > row) || (row <= this.row && row + height > this.row)) && ((this.col <= col && this.col + this.width > col) || (col <= this.col && col + width > this.col))
     }
 
-    encapsulates(area) {
-      
+    getAllInnerCells() {
+      const innerCells = []
+      for (let row = this.row; row <= this.bottomSide; row++) {
+        for (let col = this.col; col <= this.rightSide; col++) {
+          innerCells.push(new Selection(row, col))
+        }
+      }
+      return innerCells;
     }
   }
   
@@ -164,6 +167,11 @@ export class BoardData {
             lineStart: undefined
         }
       }
+
+      this.eraser = {
+        type: "pixel",
+        size: 1
+      }
   
       this.settings = {
         tickSpeed: 5,
@@ -232,11 +240,11 @@ export class BoardData {
 
 
       if (selections.length == 0) {
-        this.selections = selections.map(cell => Selection.clone(cell));
+        this.selections = getSortedSelections(selections);
       } else {
         const averageVerticalDistanceToCenter = Math.round(average(selections.map(cell => cell.row)))
         const averageHorizontalDistanceToCenter = Math.round(average(selections.map(cell => cell.col)))
-        this.selections = selections.map(cell => new Selection(cell.row - averageVerticalDistanceToCenter, cell.col - averageHorizontalDistanceToCenter, cell?.type, cell?.isSelected))
+        this.selections = getSortedSelections(selections.map(cell => new Selection(cell.row - averageVerticalDistanceToCenter, cell.col - averageHorizontalDistanceToCenter, cell?.type, cell?.isSelected)))
       }
     }
 
