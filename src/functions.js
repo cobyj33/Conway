@@ -132,6 +132,16 @@ export function currentTime() { return audioContext.currentTime }
     return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(-cell.col, cell.row)), centerPoint)  ;
   }
 
+  export function mirrorOverY(selections) {
+    const centerPoint = Area.corners(selections).center;
+    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(cell.row, -cell.col)), centerPoint)  ;
+  }
+
+  export function mirrorOverX(selections) {
+    const centerPoint = Area.corners(selections).center;
+    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(-cell.row, cell.col)), centerPoint)  ;
+  }
+
   export function translateSelectionsAroundPoint(selections, selection) {
     const patternArea = Area.corners(selections);
     const verticalTranslation = selection.row - patternArea.center.row

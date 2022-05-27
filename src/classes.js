@@ -71,11 +71,17 @@ export class Selection {
     }
   
     intersectsOrContains({row, col, width = 1, height = 1}) {
-        if (this.width == 0 || this.height == 0) return false
+        if (this.width === 0 || this.height === 0 || width === 0 || height === 0) return false
         return ((this.row <= row && this.row + this.height > row) || (row <= this.row && row + height > this.row)) && ((this.col <= col && this.col + this.width > col) || (col <= this.col && col + width > this.col))
     }
 
+    isSelectionOnEdge({row, col}) {
+      if (this.width === 0 || this.height === 0) return false
+      return ( (row === this.row || row === this.bottomSide) && (col >= this.col && col <= this.rightSide) ) || ( (col === this.col || col === this.rightSide - 1) && (row >= this.row && row <= this.bottomSide) )
+     }
+
     getAllInnerCells() {
+      if (this.width === 0 || this.height === 0) return []
       const innerCells = []
       for (let row = this.row; row <= this.bottomSide; row++) {
         for (let col = this.col; col <= this.rightSide; col++) {
