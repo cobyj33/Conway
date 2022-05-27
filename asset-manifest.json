@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/Conway/static/css/main.5681863c.css",
-    "main.js": "/Conway/static/js/main.3b8da5c0.js",
+    "main.js": "/Conway/static/js/main.4cc973e7.js",
     "static/media/Conway Logo.png": "/Conway/static/media/Conway Logo.f45e993d8295e199432b.png",
     "index.html": "/Conway/index.html",
     "main.5681863c.css.map": "/Conway/static/css/main.5681863c.css.map",
-    "main.3b8da5c0.js.map": "/Conway/static/js/main.3b8da5c0.js.map"
+    "main.4cc973e7.js.map": "/Conway/static/js/main.4cc973e7.js.map"
   },
   "entrypoints": [
     "static/css/main.5681863c.css",
-    "static/js/main.3b8da5c0.js"
+    "static/js/main.4cc973e7.js"
   ]
 }
