@@ -12,8 +12,6 @@ export const PatternDisplay = ({ pattern }) => {
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
     const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData( { selections: pattern.selections.map(cell => Selection.clone(cell)) } ));
     const initialBoardView = useMemo( () => getPatternView(pattern), [pattern])
-
-
     
     return (
       <div className="pattern-display">

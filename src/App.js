@@ -20,30 +20,10 @@ export const BoardContext = createContext();
 export const RenderContext = createContext();
 export const AlertContext = createContext();
 
-export let AFK = false;
-const TIME_TO_AFK_MODE = 1000;
-let lastInput = Date.now();
-
-function onInput() {
-  lastInput = Date.now();
-  setTimeout(() => { AFK = Date.now() - lastInput > TIME_TO_AFK_MODE; console.log("is AFK: ", AFK) } , TIME_TO_AFK_MODE + 500)
-}
-
-window.addEventListener("mouseup", onInput)
-window.addEventListener("mousedown", onInput)
-window.addEventListener("keydown", onInput)
-window.addEventListener("keyup", onInput)
-
 export let currentMousePosition = { x: 0, y: 0 }
 window.addEventListener("mousemove", (mouseEvent) => {
   currentMousePosition = { x: mouseEvent.clientX, y: mouseEvent.clientY }
 })
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === 's' && (navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)) {
-    e.preventDefault();
-  }
-});
 
 document.addEventListener("keydown", event => {
   if (event.key === 's' && (event.ctrlKey || event.metaKey)) {
@@ -164,6 +144,10 @@ export const App = () => {
 
         console.log("renders object: ", this)
       }, 
+
+      hasNextFrame(currentFrameString) {
+        return currentFrameString in this.frames;
+      },  
 
       getNextFrame(currentFrameString) {
         return this.frames[currentFrameString]

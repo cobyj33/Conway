@@ -1,10 +1,9 @@
 import { cloneDeep } from 'lodash'
-import { average, getSortedSelections } from './functions'
+import { average, getSortedSelections, removeDuplicates } from './functions'
 export class Selection {
-    constructor(row, col, type = 'cell', isSelected = false) {
+    constructor(row, col, isSelected = false) {
       this.row = row
       this.col = col
-      this.type = type
       this.isSelected = isSelected
     }
 
@@ -12,14 +11,8 @@ export class Selection {
       return Math.sqrt( Math.pow(( first.col - second.col), 2) + Math.pow(( first.row - second.row ), 2) )
     } 
 
-    static clone(selection) {
-      const {row, col, type, isSelected} = selection
-      return new Selection(row, col, type, isSelected)
-    }
-
-    static StringToSelection(string) {
-      const {row, col, type} = JSON.parse(string);
-      return new Selection(Number(row), Number(col), type);
+    static clone({row, col, isSelected}) {
+      return new Selection(row, col, isSelected)
     }
   }
   
@@ -33,11 +26,11 @@ export class Selection {
     }
     
     get rightSide() {
-        return this.col + this.width
+        return this.col + this.width - 1
     }
   
     get bottomSide() {
-        return this.row + this.height
+        return this.row + this.height - 1
     }
   
     get area() {
@@ -50,6 +43,22 @@ export class Selection {
   
     get info() {
         return [this.row, this.col, this.width, this.height]
+    }
+
+    get topLeft() {
+      return new Selection(this.row, this.col)
+    }
+
+    get topRight() {
+      return new Selection(this.row, this.rightSide)
+    }
+
+    get bottomLeft() {
+      return new Selection(this.bottomSide, this.col)
+    }
+
+    get bottomRight() {
+      return new Selection(this.bottomSide, this.rightSide);
     }
 
     static corners(points) {
@@ -77,7 +86,19 @@ export class Selection {
 
     isSelectionOnEdge({row, col}) {
       if (this.width === 0 || this.height === 0) return false
-      return ( (row === this.row || row === this.bottomSide) && (col >= this.col && col <= this.rightSide) ) || ( (col === this.col || col === this.rightSide - 1) && (row >= this.row && row <= this.bottomSide) )
+      return ( (row === this.row || row === this.bottomSide) && (col >= this.col && col <= this.rightSide) ) || ( (col === this.col || col === this.rightSide) && (row >= this.row && row <= this.bottomSide) )
+     }
+
+     getEdgeAreas() {
+        const topEdge = new Area(this.row, this.col, this.width, 1)
+        const leftEdge = new Area(this.row, this.col, 1, this.height)
+        const bottomEdge = new Area(this.bottomSide, this.col, this.width, 1)
+        const rightEdge = new Area(this.row, this.rightSide, 1, this.height)
+       return [topEdge, leftEdge, bottomEdge, rightEdge]
+     }
+
+     getCellsOnEdge() {
+      return removeDuplicates(this.getEdgeAreas.flatMap(area => area.getAllInnerCells()));
      }
 
     getAllInnerCells() {
