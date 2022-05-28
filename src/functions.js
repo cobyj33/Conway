@@ -428,9 +428,31 @@ export function boardStatesReducer(state, action) {
         }
         return state.concat(pattern)
       }
-      // case "delete": {
+      case "set": {
+        const { newState } = action;
+        if (newState == null) {
+          console.log("cannot set pattern array state without newState"); return state;
+        }
+        return newState;
+      }
+      case "replace": {
+        const {oldPattern, newPattern} = action;
+        const clonedState = cloneDeep(state);
+        if (oldPattern == null) {
+          console.log("cannot replace pattern array state without old pattern state"); return state;
+        } else if (newPattern == null) {
+          console.log("cannot set pattern array state without new pattern state"); return state;
+        }
 
-      // } break;
+        for (let i = 0; i < clonedState.length; i++) {
+          if (JSON.stringify(clonedState[i]) === JSON.stringify(oldPattern)) {
+            clonedState[i] = newPattern;
+            break;
+          }
+        }
+
+        return clonedState; 
+      }
       // case "edit": {
 
       // } break;

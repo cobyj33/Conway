@@ -1,4 +1,4 @@
-import {useRef, useState, useEffect, useContext, useTransition} from 'react'
+import {useRef, useState, useEffect, useContext, useTransition, useMemo} from 'react'
 import { Area, Selection, KeyBinding, Render, Pattern } from '../classes.js'
 import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
 import { BsBoundingBox, BsClipboardData, BsFileBreakFill } from "react-icons/bs"
@@ -16,10 +16,8 @@ import { isCompositeComponent } from 'react-dom/test-utils'
 const DEFAULT_SCREEN_CELL_SPAN = 8;
 const MAX_FILL_DEPTH = 100;
 const MAX_CELL_WANDER_DISTANCE = 1000;
-const MIN_EDIT_ZOOM = 0.05;
-const MIN_PLAYBACK_ZOOM = 0.01;
-const ZOOM_SHRINK_GRID_LINES = 0.1;
-const DEFAULT_GRID_LINE_WIDTH = 1;
+const MIN_EDIT_ZOOM = 0.001;
+const MIN_PLAYBACK_ZOOM = 0.001;
 
 const initialRenderStatus = {
         queued: false,
@@ -32,11 +30,13 @@ const initialRenderStatus = {
         },
     }
     
-    export const GameBoard = ( { boardData, boardDataDispatch, editable = true, closable = true, bounds = null, showToolBar = true, movable = true, drawGrid = true, initialViewArea = null } ) => {
+    export const GameBoard = ( { boardData, boardDataDispatch, editable = true, closable = true, bounds = null, showToolBar = true, movable = true, drawGrid = true, initialViewArea = null, alwaysCenter = false } ) => {
         const currentBoardData = useRef(boardData);
         useEffect( () => {
             currentBoardData.current = cloneDeep(boardData);
         }, [boardData])
+
+        const isMounted = useRef(false);
 
         const alterData = (accessor, newValue) => { 
             const keys = accessor.split(".")
@@ -53,18 +53,23 @@ const initialRenderStatus = {
     const [renderStatus, setRenderStatus] = useState(initialRenderStatus)
     const sendAlert = useContext(AlertContext)
 
+    function focusCameraOnArea(area) {
+        const newZoom = Math.min(getZoomFromCellsHorizontallyAcrossScreen(area.width), getZoomFromCellsVerticallyAcrossScreen(area.height))
+        const centerCell = area.center;
+        // const centerCell = new Selection(Math.round(average(currentBoardData.current.selections.map(cell => cell.row))) || 0, Math.round(average(currentBoardData.current.selections.map(cell => cell.col))) || 0)
+        alterData("view", { 
+            coordinates: {
+                row: centerCell.row - getCellsVerticallyAcrossScreen(newZoom) / 2,
+                col: centerCell.col - getCellsHorizontallyAcrossScreen(newZoom) / 2
+            },
+            zoom: newZoom
+        })
+    }
+
 
     useEffect( () => {
         if (initialViewArea !== null) {
-            const newZoom = Math.min(getZoomFromCellsHorizontallyAcrossScreen(initialViewArea.width), getZoomFromCellsVerticallyAcrossScreen(initialViewArea.height))
-            const centerCell = new Selection(Math.round(average(currentBoardData.current.selections.map(cell => cell.row))) || 0, Math.round(average(currentBoardData.current.selections.map(cell => cell.col))) || 0)
-            alterData("view", { 
-                coordinates: {
-                    row: centerCell.row - getCellsVerticallyAcrossScreen(newZoom) / 2,
-                    col: centerCell.col - getCellsHorizontallyAcrossScreen(newZoom) / 2
-                },
-                zoom: newZoom
-                })
+            focusCameraOnArea(initialViewArea)
         } else {
             centerCamera({row: 0, col: 0})
         }
@@ -112,7 +117,7 @@ const initialRenderStatus = {
     const isDragging = useRef(false)
     const getMillisecondsPerTick = () => 1000 / boardData.settings.tickSpeed
     const getContext = () => canvasRef.current.getContext("2d")
-    const getCanvasBounds = () => canvasRef.current.getBoundingClientRect()
+    const getCanvasBounds = () => canvasRef?.current?.getBoundingClientRect()
     const getCellSize = (zoom = boardData.view.zoom) => Math.min(getCanvasBounds().width, getCanvasBounds().height) * (zoom / DEFAULT_SCREEN_CELL_SPAN) //10 is the default span for the viewbox
     const getZoomFromCellSize = (cellSize) => (DEFAULT_SCREEN_CELL_SPAN * cellSize) / Math.min(getCanvasBounds().width, getCanvasBounds().height)
     const getCellsHorizontallyAcrossScreen = (zoom = boardData.view.zoom) => getCanvasBounds().width / getCellSize(zoom)
@@ -163,6 +168,10 @@ const initialRenderStatus = {
             row: row - getCellsVerticallyAcrossScreen(zoom) / 2,
             col: col - getCellsHorizontallyAcrossScreen(zoom) / 2
             })
+    }
+
+    function putAllCellsInView() {
+
     }
 
     function clear() {
@@ -395,10 +404,10 @@ const initialRenderStatus = {
         canvas.style.backgroundColor = boardData.playback.enabled ? 'black' : ''
         context.fillStyle = 'white'
         context.strokeStyle = 'black'
-        const getLineWidth = (bolded = true, zoom = boardData.view.zoom) => DEFAULT_GRID_LINE_WIDTH / ( zoom < ZOOM_SHRINK_GRID_LINES ? 2 : 1 ) * ( bolded ? 2 : 1)
+        const cellSize = getCellSize();
+        const getLineWidth = (bolded = true, zoom = boardData.view.zoom) => (cellSize / 10) * ( bolded ? 2 : 1)
         context.lineWidth = getLineWidth(false);
         const viewArea = getViewArea();
-        const cellSize = getCellSize();
         const { view } = boardData
         const currentBox = ({row, col, width = 1, height = 1}) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize * width, cellSize * height]
         context.clearRect(0, 0, canvas.width, canvas.height);
@@ -492,11 +501,12 @@ const initialRenderStatus = {
     useEffect(() => {
         observer.current.disconnect()
         draw()
-        observer.current = new ResizeObserver(() => {resizeCanvas(); draw()})
+        observer.current = new ResizeObserver(() => { if (alwaysCenter) {
+            centerCamera({row: 0, col: 0})
+        }; resizeCanvas(); draw();  })
         observer.current.observe(document.documentElement)
         
         if (!canvasRef.current) return
-        setShowingBackToCenterDisplay(!anyCellsInView() && currentBoardData.current.selections.length > 0)
     })
 
     
@@ -527,6 +537,10 @@ const initialRenderStatus = {
         }
         
       }, [boardData.playback.enabled])
+
+      useEffect(() => {
+        setShowingBackToCenterDisplay(!anyCellsInView() && currentBoardData.current.selections.length > 0)
+      }, [boardData.view])
 
 
 
@@ -761,6 +775,7 @@ const initialRenderStatus = {
                  }
             }; break;
             case "select": {
+                
             }; break;
         }
         boardData.brush.extra.lineStart = undefined;
@@ -941,21 +956,18 @@ const initialRenderStatus = {
         }
     }, [boardData.editMode])
 
-    // switch (editMode) {
-        
-    // }
-
+    const [showingFPSSlider, setShowingFPSSlider] = useState(false);
     const { editMode, view, selections } = currentBoardData.current
 
   return (
     <div className='game-board' ref={boardRef}>
             <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onContextMenu} onMouseEnter={onMouseEnter} onMouseLeave={() => { onMouseLeave(); onInputStop(); } } onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} onDoubleClick={doubleClickListener} tabIndex={0} style={{cursor: cursor}}/>
-        { boardData.playback.enabled && <div className='animating-ui'>
-                <h3 className='generation-display' style={{fontSize: Math.max(12, getCanvasBounds().width / 150 ) }}> Current Generation: { currentGeneration } </h3>
-                <div className='flex-column'>
+        { boardData.playback.enabled && <div className='animating-ui' onMouseLeave={() => setShowingFPSSlider(false)}>
+                <h3 className='generation-display' style={{fontSize: Math.max(12, getCanvasBounds().width / 150 ) }} onMouseEnter={() => setShowingFPSSlider(true)}> Current Generation: { currentGeneration }  { !showingFPSSlider && ">" } </h3>
+                { showingFPSSlider && <div className='flex-column'>
                     <label htmlFor="speed-slider"> FPS: { boardData.settings.tickSpeed } </label>
                     <input id="speed-slider" type='range' min='1' max='100' value={boardData.settings.tickSpeed} onChange={(event) => alterData('settings.tickSpeed', Number(event.target.value))} style={{width: "100px"}} />
-                </div>
+                </div>}
 
                 {/* <button onClick={() => alterData('settings.isScreenFit', !boardData.settings.isScreenFit)} className={`game-tool ${boardData.settings.isScreenFit ? 'selected' : 'unselected'}`}> Fit Screen </button> */}
              </div> }
@@ -1039,12 +1051,12 @@ const initialRenderStatus = {
                 <div className='game-display-information'>
                     <div className='coordinate-display flex-column' >
                         View <br/>
-                        Row: <span> {Math.round(view.coordinates.row * 100) / 100} </span> <br/>
-                        Col: <span> {Math.round(view.coordinates.col * 100) / 100} </span> <br/>
+                        <span> Row:  {Math.round(view.coordinates.row * 100) / 100} </span> <br/>
+                        <span> Col: {Math.round(view.coordinates.col * 100) / 100} </span> <br/>
                     </div>
 
                     <label htmlFor='zoom-input'> Zoom: {Math.round(view.zoom * 100) / 100} </label>
-                    <input type="range" id='zoom-input' min="0.05" max='3' step="0.05" value={view.zoom} onChange={(event) => alterData('view.zoom', Number(event.target.value)) }/>
+                    <input type="range" id='zoom-input' min={`${boardData.playback.enabled ? MIN_PLAYBACK_ZOOM : MIN_EDIT_ZOOM}`} max='3' step="0.05" value={boardData.view.zoom} onChange={(event) => alterData('view.zoom', Number(event.target.value)) }/>
                 </div> } 
         </div>
             <button onClick={() => removeCallback?.()} className={`game-tool`}> <FaWindowClose /> <ToolTip> Esc: Exit </ToolTip> </button> 
@@ -1057,6 +1069,8 @@ const initialRenderStatus = {
             <button onClick={saveSelectedAreaAsPattern}> Save Selected Area as Pattern </button>
             <button onClick={selectSelectedAreaAsPattern}> Select Selected Area as Pattern </button> 
             <button style={{backgroundColor: "red", fontWeight: "bold"}}> Close Menu </button>
+
+
         </ContextMenu>
 
         { showingPatternEditor && <PatternEditor currentPattern={editingPattern} close={() => setShowingPatternEditor(!showingPatternEditor)}/>  }

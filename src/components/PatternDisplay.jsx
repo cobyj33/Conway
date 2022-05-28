@@ -1,52 +1,51 @@
-import { useContext, useMemo, useReducer } from "react";
-import { Area, BoardData, Selection } from "../classes";
+import { useContext, useMemo, useReducer, useState } from "react";
+import { Area, BoardData, Pattern, Selection } from "../classes";
 import { boardReducer, getPatternView } from "../functions";
 import { GameBoard } from "./GameBoard";
 import { BoardContext, PatternContext } from "../App";
 import { FaChevronCircleDown } from "react-icons/fa";
 import { ToolTip } from "./ToolTip/ToolTip";
 import "./creationmenu.css"
+import { PatternEditor } from "./PatternEditor";
+import { cloneDeep } from "lodash";
 
-export const PatternDisplay = ({ pattern }) => {
+const SHORT_DESCRIPTION_LENGTH = 20;
+
+export const PatternDisplay = ({ currentPattern }) => {
     const [patterns, setPatterns] = useContext(PatternContext)
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
-    const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData( { selections: pattern.selections.map(cell => Selection.clone(cell)) } ));
-    const initialBoardView = useMemo( () => getPatternView(pattern), [pattern])
+    const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData( { selections: currentPattern.selections.map(cell => Selection.clone(cell)) } ));
+    const [showingPatternEditor, setShowingPatternEditor] = useState(false);
+    const initialBoardView = useMemo( () => getPatternView(currentPattern), [currentPattern])
     
     return (
       <div className="pattern-display">
         <div className='board-container'>
-          <GameBoard boardData={boardData} boardDataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} initialViewArea={initialBoardView} /> 
+          <GameBoard boardData={boardData} boardDataDispatch={boardDataDispatch} closable={false} editable={false} showToolBar={false} initialViewArea={initialBoardView} alwaysCenter={true} /> 
         </div>
   
         <div className='pattern-display-information'> 
-            <div className='pattern-display-main-data'>
-            <span className="pattern-name pattern-data"> Name: {pattern.name} </span>
-            <span className="pattern-count pattern-data"> Count: {pattern.count} </span>
+          <div className='pattern-display-main-data'>
+            <span className="pattern-name pattern-data" style={{marginRight: "10px"}}> Name: {currentPattern.name} </span>
+            <span className="pattern-count pattern-data"> Count: {currentPattern.count} </span>
           </div>
+
           <div className='pattern-display-meta-data'> 
-            <span className="pattern-creator pattern-data"> Creator: {pattern.name} </span>
-            <span className="pattern-date pattern-data"> Created: {pattern.dateCreated.toDateString()} </span>
-            <span className="pattern-date pattern-data"> Last Modified: {pattern.lastModified.toDateString()} </span>
-            <span className="pattern-description pattern-data"> Description: {pattern.description.substr(0, 20)} { pattern.description.length > 20 ? <ToolTip> {pattern.description} </ToolTip> : '' } </span>
+            <span className="pattern-description pattern-data"> Description: {currentPattern.description.substr(0, SHORT_DESCRIPTION_LENGTH) + (currentPattern.description.length > SHORT_DESCRIPTION_LENGTH ? "..." : "" ) } { currentPattern.description.length > SHORT_DESCRIPTION_LENGTH ? <ToolTip> {currentPattern.description} </ToolTip> : '' } </span>
           </div>
   
           <div className='pattern-display-interact'>
-            <button> Edit </button>
-            <button> Preview </button>
-            <button onClick={() => console.log(JSON.stringify(pattern))}> Log JSON </button>
-            <button onClick={() => gameBoards.forEach( board => { 
+            <button className={showingPatternEditor ? "selected" : ""} onClick={ () => setShowingPatternEditor(!showingPatternEditor) }> Edit </button>
+            <button className={boardData.playback.enabled ? "selected" : ""} onClick={() => boardDataDispatch({type: 'alter', request: { accessor: "playback.enabled", newValue: !boardData.playback.enabled} })}> Preview </button>
+            <button onClick={() => navigator.clipboard.writeText(JSON.stringify(currentPattern))}> Copy JSON to Clipboard </button>
+            <button className={gameBoards.forEach(board => JSON.stringify(board.pattern.selections) === JSON.stringify(currentPattern.selections)) ? "selected" : ""} onClick={() => gameBoards.forEach( board => { 
               gameBoardsDispatch({type: 'alter', id: board.id, request: { accessor: 'brush.type', newValue: 'pattern' }})
-              gameBoardsDispatch({ type: "alter", id: board.id, request: { accessor: 'pattern', newValue: pattern } })} ) }> Select As Brush </button>
-              <button onClick={() => setPatterns(patterns.filter(pat => JSON.stringify(pat) !== JSON.stringify(pattern)))}> Delete </button>
-          </div>
-  
-          <div className="pattern-display-social">
-            <button> Like </button>
-            <button> Save </button>
-            <button> Share </button>
+              gameBoardsDispatch({ type: "alter", id: board.id, request: { accessor: 'pattern', newValue: cloneDeep(currentPattern) } })} ) }> Select As Brush </button>
+              <button className="pattern-delete-button" onClick={() => setPatterns(patterns.filter(pattern => JSON.stringify(pattern) !== JSON.stringify(currentPattern)))}> Delete </button>
           </div>
         </div>
+
+        { showingPatternEditor && <PatternEditor currentPattern={cloneDeep(currentPattern)} onSubmit={(patternData) => setPatterns({ type: 'replace', oldPattern: currentPattern, newPattern: new Pattern(patternData) }) } close={() => setShowingPatternEditor(false)} style={{position: 'fixed', zIndex: 10000}} /> } 
       </div>
     )
   }

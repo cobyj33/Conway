@@ -11,9 +11,10 @@ export const PatternEditor = ({ currentPattern, style, onSubmit, close }) => {
     const [patternName, setPatternName] = useState(currentPattern.name)
     const [patternDescription, setPatternDescription] = useState(currentPattern.description)
     const initialBoardView = useMemo( () => getPatternView(currentPattern), [currentPattern])
+    const getPatternData = () => { return { name: patternName, description: patternDescription, selections: boardData.selections } }
     
-    function savePattern() {
-      savedPatternsDispatch({ type: "add", pattern: new Pattern({ name: patternName, description: patternDescription, selections: boardData.selections })})
+    function savePattern(patternData) {
+      savedPatternsDispatch({ type: "add", pattern: new Pattern(patternData)})
     }
   
     return (
@@ -34,7 +35,7 @@ export const PatternEditor = ({ currentPattern, style, onSubmit, close }) => {
               <input value={patternDescription} onChange={(event) => setPatternDescription(event.target.value)} />
           </div>
 
-          <button onClick={() => { onSubmit == null ? savePattern() : onSubmit(); close?.() } }> Submit</button>
+          <button onClick={() => { onSubmit == null ? savePattern(getPatternData()) : onSubmit(getPatternData()); close?.() } }> Submit</button>
         </div>
       </div>
     )

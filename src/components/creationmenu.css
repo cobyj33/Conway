@@ -19,6 +19,9 @@
     align-items: center;
 
     background-color: rgb(50, 50, 50);
+    background-image: url("../assets/Matters In My Own Hands.png");
+    background-repeat: no-repeat;
+    background-size: cover;
     border-bottom: 2px solid black;
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
@@ -53,7 +56,7 @@
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
-    padding: 10px;
+    padding: 20px;
     max-width: 100vw;
     max-height: 100vh; 
     background-color: black;
@@ -65,6 +68,8 @@
     flex-shrink: 2;
     flex-basis: 0px;
     background-color: red;
+    background-color: #222;
+    padding: 5px;
 }
 
 .pattern-display .board-container .game-board, .render-display .board-container .game-board {
@@ -81,12 +86,14 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    background-color: #222;
+    padding: 10px;
 }
 
 .pattern-display-information > div, .render-display-information > div {
     display: flex;
     flex-direction: row;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
 }
 
@@ -100,4 +107,14 @@
 
 .menu-choices button {
     border-bottom: rgb(50, 50, 50);
+}
+
+.pattern-delete-button:hover {
+    transition: color 0.2s;
+    color: red;
+}
+
+.creation-menu button.selected {
+    transition: color 0.1s;
+    color: green;
 }

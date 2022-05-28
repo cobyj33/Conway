@@ -26,10 +26,9 @@
   
   .animating-ui {
     position: absolute;
-    right: 10%;
+    left: 50%;
+    transform: translateX(-50%);
     bottom: 10px;
-    width: 80%;
-    
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -44,6 +43,34 @@
   .game-display-information {
     position: absolute;
     top: 100%;
+    animation: load;
+    animation-duration: 1s;
+    animation-iteration-count: 1;
+    animation-timing-function: ease-out;
+    background: radial-gradient(#444, #666);
+    border: 1px solid black;
+    border-radius: 10%;
+    padding-top: 20px;
+    padding-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  @keyframes load {
+    0% { max-width: 10px; max-height: 10px; opacity: 0; }
+    100% { max-width: 100vw; max-height: 100vh; opacity: 1; }
+  }
+
+  #zoom-input {
+    width: 50%;
+  }
+
+  .game-display-information:hover {
+    transition: padding 0.5s, border-bottom 0.5s;
+    padding-bottom: 40px;
+    border-bottom: 10px solid black;
   }
   
   .game-toolbar {
@@ -64,7 +91,7 @@
       
   }
 
-  .selected {
+  .game-board .selected {
       background-color: #666;
       border-radius: 2px;
   }

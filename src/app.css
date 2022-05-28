@@ -28,6 +28,10 @@ html, body, body > div {
   text-align: center;
 }
 
+input {
+  user-select: auto;
+}
+
 button {
   border: none;
   background: none;

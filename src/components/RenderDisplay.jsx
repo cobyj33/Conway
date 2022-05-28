@@ -18,6 +18,7 @@ export const RenderDisplay = ({ startingSelectionsJSON }) => {
       if (boardNum == -1) {
         gameBoardsDispatch({type: "add", boardData: new BoardData(boardData)})
       } else {
+        console.log("onBoardSelection ", boardNum);
         gameBoardsDispatch({type: "alter",
         id: gameBoards[boardNum].id,
         request: {
@@ -46,8 +47,9 @@ export const RenderDisplay = ({ startingSelectionsJSON }) => {
           <span className='render-data'> # Of Generations: {generationCount} </span>
           <span className='render-data'> Starting Cell Count: {startingSelectionsLength} </span>  
   
-          <button > Play </button>
+          <button className={boardData.playback.enabled ? "selected" : ""} onClick={() => boardDataDispatch({type: "alter", request: { accessor: "playback.enabled", newValue: !boardData.playback.enabled}})} > Play </button>
           <button onClick={() => setShowingBoardSelector(!showingBoardSelector)}> Add to Main View </button>
+          <button onClick={() => navigator.clipboard.writeText(JSON.stringify(renders.current.getRenderData(startingSelectionsJSON)))}> Copy JSON to Clipboard </button>
         </div>
   
         { showingBoardSelector && <BoardSelector onSelection={(num) => onBoardSelection(num)} onClose={() => setShowingBoardSelector(!showingBoardSelector)} /> }

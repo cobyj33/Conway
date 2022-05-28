@@ -61,6 +61,10 @@ export class Selection {
       return new Selection(this.bottomSide, this.rightSide);
     }
 
+    static clone( { row, col, width, height } ) {
+      return new Area(row, col, width, height)
+    }
+
     static corners(points) {
       // const [first, second, third, fourth] = points
       if (points.length < 1) {
@@ -260,10 +264,10 @@ export class BoardData {
     constructor({ selections = [], name = getPatternID(), creator = "Jacoby", description = " A Pattern ", dateCreated = new Date(), lastModified = new Date() }) {
       this.name = name;
       this.id = name.startsWith("Pattern #") ? name : getPatternID()
-      this.creator = creator;
+      // this.creator = creator;
       this.description = description;
-      this.dateCreated = dateCreated
-      this.lastModified = lastModified
+      // this.dateCreated = dateCreated
+      // this.lastModified = lastModified
 
 
       if (selections.length == 0) {

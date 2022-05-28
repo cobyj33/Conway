@@ -151,8 +151,27 @@ export const App = () => {
 
       getNextFrame(currentFrameString) {
         return this.frames[currentFrameString]
+      },
+
+      getRenderData(startingSelectionsJSON) {
+        return {
+          starter: startingSelectionsJSON,
+          frames: this.getFrames(startingSelectionsJSON)
+        }
+      },
+
+      loadRenderData({starter, frames}) {
+        for (let currentFrame = 0; currentFrame < frames.length - 1; currentFrame++) {
+          this.frames[frames[currentFrame]] = frames[currentFrame + 1]
+        }
+
+        if (!this.starters.some(selectionsJSON => selectionsJSON === starter)) {
+          this.starters.push(starter)
+        }
       }
     });
+
+    
 
     function getMenu(menu) {
 

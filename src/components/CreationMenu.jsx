@@ -7,6 +7,7 @@ import { PatternContext, RenderContext } from '../App';
 import { ToolTip } from './ToolTip/ToolTip';
 import { PatternDisplay } from './PatternDisplay';
 import { RenderDisplay } from './RenderDisplay';
+import { FaBars } from "react-icons/fa"
 
 
 export const CreationMenu = ({ close }) => {
@@ -14,6 +15,8 @@ export const CreationMenu = ({ close }) => {
   const renders = useContext(RenderContext)
   const [position, setPosition] = useState({left: 100, top: 100});
   const [currentMenu, setCurrentMenu] = useState('My Patterns');
+  const [showingPatternEditor, setShowingPatternEditor] = useState(false);
+  const [showingMenuChoices, setShowingMenuChoices] = useState(false);
   
   const menu = useRef()
   
@@ -23,7 +26,7 @@ export const CreationMenu = ({ close }) => {
       case "My Renders":
         return renders.current.starters.length == 0 ? <span> No Saved Renders </span> : renders.current.starters.map(startingSelectionsJSON => <RenderDisplay key={startingSelectionsJSON} startingSelectionsJSON={startingSelectionsJSON}/>) 
       case "My Patterns":
-        return patterns.length == 0 ? <span> No Saved Patterns </span> : patterns.map(pattern => <PatternDisplay key={pattern.id} pattern={pattern} />)
+        return patterns.length == 0 ? <span> No Saved Patterns </span> : patterns.map(pattern => <PatternDisplay key={pattern.id} currentPattern={pattern} />)
       default: return "Error: Invalid Menu"
     }
   }
@@ -47,16 +50,15 @@ export const CreationMenu = ({ close }) => {
 
       <div className="creation-menu-top-bar" >
         <div className='creation-menu-selections'>
-            <div className="menu-choices">
-              <button onClick={() => setCurrentMenu("My Patterns")}> My Patterns </button>
-              <button onClick={() => setCurrentMenu("My Renders")}> My Renders </button>
-            </div>
+            
         </div>
         <div className="creation-menu-top-bar-options">
             <h3> { currentMenu } </h3>
-            <input className="creation-search" type="text" />
-            <button > <FaPlusCircle /> </button>
-            <button onClick={close}> <FaWindowClose /> <ToolTip> To Game </ToolTip> </button>
+            <button onMouseEnter={() => setShowingMenuChoices(true)}> <FaBars /> </button>
+            { showingMenuChoices && <div className="menu-choices" onMouseLeave={() => setShowingMenuChoices(false)}>
+              <button onClick={() => setCurrentMenu("My Patterns")}> My Patterns </button>
+              <button onClick={() => setCurrentMenu("My Renders")}> My Renders </button>
+            </div>}
         </div>
       </div>
 
@@ -67,14 +69,4 @@ export const CreationMenu = ({ close }) => {
 
     </div>
   )
-}
-
-const VIEW_PADDING = 5;
-
-function getPatternBounds(pattern) {
-  const viewArea = Area.corners(pattern.selections);
-}
-
-function getRenderBounds(render) {
-  const topRight = new Selection(Math.min())
 }
