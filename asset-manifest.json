@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/Conway/static/css/main.c6b3b7a1.css",
-    "main.js": "/Conway/static/js/main.f328cbf0.js",
+    "main.css": "/Conway/static/css/main.e2fd1b87.css",
+    "main.js": "/Conway/static/js/main.b9df51c5.js",
     "static/media/Conway Logo.png": "/Conway/static/media/Conway Logo.f45e993d8295e199432b.png",
     "static/media/Matters In My Own Hands.png": "/Conway/static/media/Matters In My Own Hands.4e8d90919c1b85ab43d0.png",
     "index.html": "/Conway/index.html",
-    "main.c6b3b7a1.css.map": "/Conway/static/css/main.c6b3b7a1.css.map",
-    "main.f328cbf0.js.map": "/Conway/static/js/main.f328cbf0.js.map"
+    "main.e2fd1b87.css.map": "/Conway/static/css/main.e2fd1b87.css.map",
+    "main.b9df51c5.js.map": "/Conway/static/js/main.b9df51c5.js.map"
   },
   "entrypoints": [
-    "static/css/main.c6b3b7a1.css",
-    "static/js/main.f328cbf0.js"
+    "static/css/main.e2fd1b87.css",
+    "static/js/main.b9df51c5.js"
   ]
 }
