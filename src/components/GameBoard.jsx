@@ -935,6 +935,7 @@ const initialRenderStatus = {
     const [showingPatternOptions, setShowingPatternOptions] = useState(false)
     const [showingPatternEditor, setShowingPatternEditor] = useState(false)
     const [editingPattern, setEditingPattern] = useState(null)
+    
     useEffect( () => {
         if (showingRenderPrompt === false) {
             specialRenderRequest.current = null
@@ -961,7 +962,7 @@ const initialRenderStatus = {
 
   return (
     <div className='game-board' ref={boardRef}>
-            <canvas className='game-canvas' ref={canvasRef} onMouseDown={mouseDownListener} onMouseUp={onMouseUp} onContextMenu={onContextMenu} onMouseEnter={onMouseEnter} onMouseLeave={() => { onMouseLeave(); onInputStop(); } } onMouseMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} onDoubleClick={doubleClickListener} tabIndex={0} style={{cursor: cursor}}/>
+            <canvas className='game-canvas' ref={canvasRef} onPointerDown={mouseDownListener} onPointerUp={onMouseUp} onContextMenu={onContextMenu} onPointerEnter={onMouseEnter}  onPointerLeave={() => { onMouseLeave(); onInputStop(); } } onPointerMove={mouseMoveListener} onKeyDown={keyListener} onKeyUp={keyUpListener} onDoubleClick={doubleClickListener} tabIndex={0} style={{cursor: cursor}}/>
         { boardData.playback.enabled && <div className='animating-ui' onMouseLeave={() => setShowingFPSSlider(false)}>
                 <h3 className='generation-display' style={{fontSize: Math.max(12, getCanvasBounds().width / 150 ) }} onMouseEnter={() => setShowingFPSSlider(true)}> Current Generation: { currentGeneration }  { !showingFPSSlider && ">" } </h3>
                 { showingFPSSlider && <div className='flex-column'>
