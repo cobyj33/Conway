@@ -1,5 +1,11 @@
-import {useRef, useState, useEffect, useContext, useTransition, useMemo} from 'react'
-import { Area, Selection, KeyBinding, Render, Pattern } from '../classes.js'
+import {useRef, useState, useEffect, useContext, useTransition} from 'react'
+
+import { Area } from "../classes/Area.js";
+import { Selection } from "../classes/Selection.js";
+import { KeyBinding } from "../classes/KeyBinding.js";
+import { Pattern } from "../classes/Pattern.js";
+
+
 import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
 import { BsBoundingBox, BsClipboardData, BsFileBreakFill } from "react-icons/bs"
 import { AiFillCloseCircle } from "react-icons/ai"
@@ -7,10 +13,11 @@ import "./gameboard.css"
 import { ToolTip } from './ToolTip/ToolTip.jsx'
 import { shuffle, cloneDeep } from 'lodash'
 import { getLine, getBox, getEllipse, mirrorOverX, mirrorOverY, getNextGeneration, removeDuplicates, getAdjacentNeighbors, equalSelectionLists, rotateSelections90, millisecondsToTimeString, average, currentTime, translateSelectionsAroundPoint } from '../functions.js'
-import { AlertContext, PatternContext, RenderContext } from '../App.js'
+import { AlertContext, gpu, PatternContext, RenderContext } from '../App.js'
 import { ContextMenu } from './ContextMenu.jsx'
 import { PatternEditor } from './PatternEditor.jsx'
 import { isCompositeComponent } from 'react-dom/test-utils'
+// import { drawCanvas } from '../functions/gpufunctions.js';
 
 //edit modes: draw, erase, pan, zoom, select
 const DEFAULT_SCREEN_CELL_SPAN = 8;
@@ -399,6 +406,12 @@ const initialRenderStatus = {
 
     function draw() {
         const canvas = canvasRef.current
+
+        // drawCanvas.setOutput([canvas.width, canvas.height]);
+        // const drawnCanvas = drawCanvas()
+        console.log()
+
+
         if (!canvasRef.current) return
         const context = getContext()
         canvas.style.backgroundColor = boardData.playback.enabled ? 'black' : ''

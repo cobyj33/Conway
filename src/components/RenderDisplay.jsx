@@ -1,5 +1,6 @@
 import { boardReducer } from "../functions";
-import { BoardData } from "../classes";
+
+import { BoardData } from "../classes/BoardData";
 import { useReducer, useContext, useState, useMemo, useEffect } from "react";
 import { RenderContext, BoardContext } from "../App";
 import { GameBoard } from "./GameBoard";

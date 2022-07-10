@@ -1,6 +1,8 @@
 
 import { cloneDeep } from "lodash";
-import { Area, Selection } from "./classes.js";
+import { Selection } from "./classes/Selection.js"
+import { Area } from "./classes/Area.js"
+
 
 const audioContext = new AudioContext()
 const VIEW_PADDING = 10;
@@ -62,17 +64,6 @@ export function currentTime() { return audioContext.currentTime }
       return [...areas].map(area => JSON.parse(area))
   }
 
-  // export function getRender(selections, generations) {
-  //   const renders = new Array(generations).fill()
-  //   let currentGeneration = selections.map(sel => Selection.clone(sel))
-  //   for (let i = 0; i < generations; i++) {
-  //     renders[i] = currentGeneration;
-  //     currentGeneration = getNextGeneration(currentGeneration, new Set(currentGeneration.map(cell => JSON.stringify(cell))))
-  //   }
-
-  //   return new Render(selections.map(sel => Selection.clone(sel)), renders)
-  // } 
-
   export function getNextGeneration(selections, selectionSet) {
     if (selectionSet == null) {
       selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
@@ -88,7 +79,15 @@ export function currentTime() { return audioContext.currentTime }
     }
 
     return testCells.filter(nextGenFilter)
-  }   
+  }
+
+  export async function getNextGenerationParallel(selections, selectionSet) {
+    if (selectionSet == null) {
+      selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
+    }
+
+    
+  }
 
   export function equalSelectionLists(firstList, secondList) {
     if (firstList.length !== secondList.length) return false
