@@ -2,7 +2,7 @@ import React, { useContext, useRef } from 'react'
 import "./creationmenu.css"
 import { FaPlusCircle, FaWindowClose } from "react-icons/fa";
 import { useState } from 'react';
-import { PatternContext, RenderContext } from '../App';
+import { PatternContext, RenderContext } from '../../App';
 import { PatternDisplay } from './PatternDisplay';
 import { RenderDisplay } from './RenderDisplay';
 import { FaBars } from "react-icons/fa"

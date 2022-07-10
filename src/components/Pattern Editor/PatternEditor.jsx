@@ -1,11 +1,11 @@
 import { useContext, useMemo, useReducer, useState } from "react"
-import { PatternContext } from "../App"
-import { Selection } from "../classes/Selection";
-import { Pattern } from "../classes/Pattern";
-import { BoardData } from "../classes/BoardData";
+import { PatternContext } from "../../App"
+import { Selection } from "../../classes/Selection";
+import { Pattern } from "../../classes/Pattern";
+import { BoardData } from "../../classes/BoardData";
 
-import { boardReducer, getPatternView } from "../functions"
-import { GameBoard } from "./GameBoard"
+import { boardReducer, getPatternView } from "../../functions"
+import { GameBoard } from "../Game Board/GameBoard"
 import "./patterneditor.css"
 
 export const PatternEditor = ({ currentPattern, style, onSubmit, close }) => {

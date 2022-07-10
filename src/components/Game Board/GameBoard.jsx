@@ -1,21 +1,21 @@
 import {useRef, useState, useEffect, useContext, useTransition} from 'react'
 
-import { Area } from "../classes/Area";
-import { Selection } from "../classes/Selection";
-import { KeyBinding } from "../classes/KeyBinding";
-import { Pattern } from "../classes/Pattern";
+import { Area } from "../../classes/Area";
+import { Selection } from "../../classes/Selection";
+import { KeyBinding } from "../../classes/KeyBinding";
+import { Pattern } from "../../classes/Pattern";
 
 
 import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
 import { BsBoundingBox, BsClipboardData, BsFileBreakFill } from "react-icons/bs"
 import { AiFillCloseCircle } from "react-icons/ai"
 import "./gameboard.css"
-import { ToolTip } from './ToolTip/ToolTip.jsx'
+import { ToolTip } from '../ToolTip/ToolTip'
 import { shuffle, cloneDeep } from 'lodash'
-import { getLine, getBox, getEllipse, mirrorOverX, mirrorOverY, getNextGeneration, removeDuplicates, getAdjacentNeighbors, equalSelectionLists, rotateSelections90, millisecondsToTimeString, average, currentTime, translateSelectionsAroundPoint } from '../functions'
-import { AlertContext, gpu, PatternContext, RenderContext } from '../App'
-import { ContextMenu } from './ContextMenu.jsx'
-import { PatternEditor } from './PatternEditor.jsx'
+import { getLine, getBox, getEllipse, mirrorOverX, mirrorOverY, getNextGeneration, removeDuplicates, getAdjacentNeighbors, equalSelectionLists, rotateSelections90, millisecondsToTimeString, average, currentTime, translateSelectionsAroundPoint } from '../../functions'
+import { AlertContext, gpu, PatternContext, RenderContext } from '../../App'
+import { ContextMenu } from '../Context Menu/ContextMenu'
+import { PatternEditor } from '../Pattern Editor/PatternEditor'
 import { isCompositeComponent } from 'react-dom/test-utils'
 import { isConstructorDeclaration } from 'typescript';
 // import { drawCanvas } from '../functions/gpufunctions.js';

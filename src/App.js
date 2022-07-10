@@ -1,13 +1,13 @@
 import React, { createContext, useReducer, useRef, useState } from 'react'
-import { Sidebar } from './components/Sidebar'
+import { Sidebar } from './components/SideBar/Sidebar'
 import './app.css'
-import { GameBoard } from './components/GameBoard'
+import { GameBoard } from './components/Game Board/GameBoard'
 import { BoardData } from './classes/BoardData'
 import { Pattern } from './classes/Pattern'
-import { CreationMenu } from './components/CreationMenu'
+import { CreationMenu } from './components/Creation Menu/CreationMenu'
 import { boardStatesReducer, patternsReducer, getBoardGridStyle, getNextGeneration} from './functions.ts'
 import icon from "./assets/Conway Logo.png"
-import { Alert } from './components/Alert'
+import { Alert } from './components/Alert/Alert'
 const patterns = require("./assets/patterns.json")
 .map(patternData => new Pattern(patternData))
 

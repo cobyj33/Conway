@@ -1,11 +1,9 @@
-import { boardReducer } from "../functions";
-
-import { BoardData } from "../classes/BoardData";
+import { BoardData } from "../../classes/BoardData";
 import { useReducer, useContext, useState, useMemo, useEffect } from "react";
-import { RenderContext, BoardContext } from "../App";
-import { GameBoard } from "./GameBoard";
-import { BoardSelector } from "./BoardSelector";
-import { getRenderView } from "../functions";
+import { RenderContext, BoardContext } from "../../App";
+import { GameBoard } from "../Game Board/GameBoard";
+import { BoardSelector } from "../Board Selector/BoardSelector";
+import { getRenderView, boardReducer } from "../../functions";
 import "./creationmenu.css"
 
 

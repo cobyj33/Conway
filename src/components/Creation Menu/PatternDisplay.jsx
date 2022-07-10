@@ -1,16 +1,16 @@
 import { useContext, useMemo, useReducer, useState } from "react";
 
-import { Selection } from "../classes/Selection";
-import { Pattern } from "../classes/Pattern";
-import { BoardData } from "../classes/BoardData";
+import { Selection } from "../../classes/Selection";
+import { Pattern } from "../../classes/Pattern";
+import { BoardData } from "../../classes/BoardData";
 
-import { boardReducer, getPatternView } from "../functions";
-import { GameBoard } from "./GameBoard";
-import { BoardContext, PatternContext } from "../App";
+import { boardReducer, getPatternView } from "../../functions";
+import { GameBoard } from "../Game Board/GameBoard";
+import { BoardContext, PatternContext } from "../../App";
 import { FaChevronCircleDown } from "react-icons/fa";
-import { ToolTip } from "./ToolTip/ToolTip";
+import { ToolTip } from "../ToolTip/ToolTip";
 import "./creationmenu.css"
-import { PatternEditor } from "./PatternEditor";
+import { PatternEditor } from "../Pattern Editor/PatternEditor";
 import { cloneDeep } from "lodash";
 
 const SHORT_DESCRIPTION_LENGTH = 20;

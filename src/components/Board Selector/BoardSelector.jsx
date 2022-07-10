@@ -1,8 +1,8 @@
 import React, { useContext, useState, useEffect } from 'react'
-import { BoardContext } from '../App'
+import { BoardContext } from '../../App'
 import { FaWindowClose } from "react-icons/fa"
 import "./boardselector.css"
-import { getBoardGridStyle } from '../functions'
+import { getBoardGridStyle } from '../../functions'
 
 export const BoardSelector = ({ onSelection, onClose }) => {
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
