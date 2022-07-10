@@ -1,7 +1,7 @@
 import { useContext, useMemo, useReducer, useState } from "react";
 
-import { Selection } from "../classes/Selection.js";
-import { Pattern } from "../classes/Pattern.js";
+import { Selection } from "../classes/Selection";
+import { Pattern } from "../classes/Pattern";
 import { BoardData } from "../classes/BoardData";
 
 import { boardReducer, getPatternView } from "../functions";
@@ -18,7 +18,7 @@ const SHORT_DESCRIPTION_LENGTH = 20;
 export const PatternDisplay = ({ currentPattern }) => {
     const [patterns, setPatterns] = useContext(PatternContext)
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
-    const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData( { selections: currentPattern.selections.map(cell => Selection.clone(cell)) } ));
+    const [boardData, boardDataDispatch] = useReducer(boardReducer, BoardData.FromSelections(currentPattern.selections.map(cell => Selection.clone(cell))));
     const [showingPatternEditor, setShowingPatternEditor] = useState(false);
     const initialBoardView = useMemo( () => getPatternView(currentPattern), [currentPattern])
     

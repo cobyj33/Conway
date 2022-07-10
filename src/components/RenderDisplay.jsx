@@ -10,7 +10,7 @@ import "./creationmenu.css"
 
 
 export const RenderDisplay = ({ startingSelectionsJSON }) => {
-    const [boardData, boardDataDispatch] = useReducer(boardReducer, new BoardData({selections: JSON.parse(startingSelectionsJSON), }));
+    const [boardData, boardDataDispatch] = useReducer(boardReducer, BoardData.FromSelections(JSON.parse(startingSelectionsJSON)));
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
     const [showingBoardSelector, setShowingBoardSelector] = useState(false);
     const renders = useContext(RenderContext)

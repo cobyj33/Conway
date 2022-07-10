@@ -1,14 +1,15 @@
 
 import { cloneDeep } from "lodash";
-import { Selection } from "./classes/Selection.js"
-import { Area } from "./classes/Area.js"
+import { Selection } from "./classes/Selection"
+import { Area } from "./classes/Area"
+import { BoardData } from "./classes/BoardData";
 
 
-const audioContext = new AudioContext()
-const VIEW_PADDING = 10;
-export function currentTime() { return audioContext.currentTime }
+const audioContext: AudioContext = new AudioContext()
+const VIEW_PADDING: number = 10;
+export function currentTime(): number { return audioContext.currentTime }
 
-  export function getAdjacentNeighbors(selection) {
+  export function getAdjacentNeighbors(selection: Selection): Selection[] {
     const {row: centerRow, col: centerCol} = selection
     return [
         new Selection(centerRow - 1, centerCol),
@@ -18,7 +19,7 @@ export function currentTime() { return audioContext.currentTime }
     ]
   }
 
-  export function getNeighbors(selection) {
+  export function getNeighbors(selection: Selection): Selection[] {
     const {row, col} = selection;
     return getAdjacentNeighbors(selection).concat([
         new Selection(row + 1, col + 1),
@@ -28,11 +29,11 @@ export function currentTime() { return audioContext.currentTime }
     ])
   } 
 
-  export function removeDuplicates(selectionList) {
-    const tracker = new Set([])
+  export function removeDuplicates(selectionList: Selection[]): Selection[] {
+    const tracker = new Set<string>([])
 
     return selectionList.filter(cell => {
-        const cellString = JSON.stringify(cell);
+        const cellString: string = JSON.stringify(cell);
         if (tracker.has(cellString)) {
             return false;
         } else {
@@ -42,36 +43,37 @@ export function currentTime() { return audioContext.currentTime }
     })
   }
 
-  export function getLiveNeighbors(selection, living) {
+  export function getLiveNeighbors(selection: Selection, living: Set<string>): Selection[] {
     return getNeighbors(selection).filter(neighbor => living.has(JSON.stringify(neighbor)))
   }
 
-  export function getLiveNeighborCount(selection, living) {
-    let count = 0;
+  export function getLiveNeighborCount(selection: Selection, living: Set<string>): number {
+    let count: number = 0;
     for (let row = selection.row - 1; row <= selection.row + 1; row++) {
       for (let col = selection.col - 1; col <= selection.col + 1; col++) {
         if ( !(row === selection.row && col === selection.col)) {
-          count += living.has(JSON.stringify(new Selection(row, col)))
+          count += living.has(JSON.stringify(new Selection(row, col))) ? 1 : 0;
         }
       }
     }
     return count;
   }
 
-  export function getAreasToCheck(selections) {
-      const areas = new Set([])
+  //TODO: Create Set type that would remove the need for JSON Stringify and Parsing for checking equality
+  export function getAreasToCheck(selections: Selection[]): Selection[] {
+      const areas: Set<string> = new Set<string>([])
       selections.forEach(cell => [...getNeighbors(cell), Selection.clone(cell)].forEach(checkedCell => areas.add(JSON.stringify(checkedCell))))
       return [...areas].map(area => JSON.parse(area))
   }
 
-  export function getNextGeneration(selections, selectionSet) {
+  export function getNextGeneration(selections: Selection[], selectionSet: Set<string>): Selection[] {
     if (selectionSet == null) {
       selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
     }
 
-    const testCells = getAreasToCheck(selections);
-    const nextGenFilter = cell => {
-        const numOfLiveNeighbors = getLiveNeighborCount(cell, selectionSet)
+    const testCells: Selection[] = getAreasToCheck(selections);
+    const nextGenFilter = (cell: Selection) => {
+        const numOfLiveNeighbors: number = getLiveNeighborCount(cell, selectionSet)
         if (selectionSet.has(JSON.stringify(cell))) {
             return numOfLiveNeighbors === 2 || numOfLiveNeighbors === 3 
         } 
@@ -81,21 +83,22 @@ export function currentTime() { return audioContext.currentTime }
     return testCells.filter(nextGenFilter)
   }
 
-  export async function getNextGenerationParallel(selections, selectionSet) {
-    if (selectionSet == null) {
-      selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
-    }
+  // export async function getNextGenerationParallel(selections, selectionSet) {
+  //   if (selectionSet == null) {
+  //     selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
+  //   }
 
     
-  }
+  // }
 
-  export function equalSelectionLists(firstList, secondList) {
+  export function equalSelectionLists(firstList: Selection[], secondList: Selection[]) {
     if (firstList.length !== secondList.length) return false
     const firstSet = new Set(firstList.map(sel => JSON.stringify(sel)))
     return secondList.every(sel => firstSet.has(JSON.stringify(sel)))
   }
 
-  export function getRenderView(rendersRef, startingSelectionsJSON) {
+  //TODO: fix this?
+  export function getRenderView(rendersRef: any, startingSelectionsJSON: string): Area {
     // const frames = rendersRef.current.getFrames(startingSelectionsJSON)
     // if (frames.length === 0) return null
     // const firstFrame = JSON.parse(frames[0])
@@ -120,65 +123,66 @@ export function currentTime() { return audioContext.currentTime }
     return getPatternView({ selections: JSON.parse(startingSelectionsJSON) })
   }
 
-  export function getPatternView({ selections }) {
-    const initialArea = Area.corners(selections);
-    const { row, col, width, height } = initialArea;
+  export function getPatternView({ selections }: { selections: Selection[] }): Area {
+    const initialArea: Area = Area.corners(selections);
+    const { row, col, width, height }: { row: number, col: number, width: number, height: number} = initialArea;
     return new Area(row - VIEW_PADDING, col - VIEW_PADDING, width + VIEW_PADDING, height + VIEW_PADDING)
   }
 
-  export function rotateSelections90(selections) {
-    const centerPoint = Area.corners(selections).center;
-    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(-cell.col, cell.row)), centerPoint)  ;
+  export function rotateSelections90(selections: Selection[]): Selection[]  {
+    const centerPoint: Selection = Area.corners(selections).center;
+    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, new Selection(0, 0)).map(cell => new Selection(-cell.col, cell.row)), centerPoint)  ;
   }
 
-  export function mirrorOverY(selections) {
-    const centerPoint = Area.corners(selections).center;
-    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(cell.row, -cell.col)), centerPoint)  ;
+  export function mirrorOverY(selections: Selection[]): Selection[]  {
+    const centerPoint: Selection = Area.corners(selections).center;
+    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, new Selection(0, 0)).map(cell => new Selection(cell.row, -cell.col)), centerPoint)  ;
   }
 
-  export function mirrorOverX(selections) {
-    const centerPoint = Area.corners(selections).center;
-    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, {row: 0, col: 0}).map(cell => new Selection(-cell.row, cell.col)), centerPoint)  ;
+  export function mirrorOverX(selections: Selection[]): Selection[] {
+    const centerPoint: Selection = Area.corners(selections).center;
+    return translateSelectionsAroundPoint(translateSelectionsAroundPoint(selections, new Selection(0, 0)).map(cell => new Selection(-cell.row, cell.col)), centerPoint)  ;
   }
 
-  export function translateSelectionsAroundPoint(selections, selection) {
-    const patternArea = Area.corners(selections);
-    const verticalTranslation = selection.row - patternArea.center.row
-    const horizontalTranslation = selection.col - patternArea.center.col
+  export function translateSelectionsAroundPoint(selections: Selection[], selection: Selection): Selection[] {
+    const patternArea: Area = Area.corners(selections);
+    const verticalTranslation: number = selection.row - patternArea.center.row
+    const horizontalTranslation: number = selection.col - patternArea.center.col
     return selections.map(cell => new Selection(cell.row + verticalTranslation, cell.col + horizontalTranslation) )
   }
 
-  export function translateSelections(selections, rows, cols) {
+  export function translateSelections(selections: Selection[], rows: number, cols: number): Selection[] {
     return selections.map(cell => new Selection(cell.row + rows, cell.col + cols))
   }
 
-  export function getLine(firstPoint, secondPoint) {
+  export function getLine(firstPoint: Selection, secondPoint: Selection): Selection[] {
     if (firstPoint == null || secondPoint == null) return []
     if (JSON.stringify(firstPoint) === JSON.stringify(secondPoint)) return [Selection.clone(firstPoint)];
     const {row: row1, col: col1} = firstPoint;
     const {row: row2, col: col2} = secondPoint;
-    const intersections = []
+    const intersections: Selection[] = []
 
     if (col1 === col2) {
         for (let row = Math.min(row1, row2); row <= Math.max(row1, row2); row++) {
             intersections.push(new Selection(Math.floor(row), Math.floor(col1)))
         }
     }
+
     else if (row1 === row2) {
         for (let col = Math.min(col1, col2); col <= Math.max(col1, col2); col++) {
             intersections.push(new Selection(Math.floor(row1), Math.floor(col)))
         }
     } else {
-        const slope = (firstPoint.row - secondPoint.row) / (firstPoint.col - secondPoint.col)
-        const yIntercept = row1 - (slope * col1);
+        const slope: number = (firstPoint.row - secondPoint.row) / (firstPoint.col - secondPoint.col)
+        const yIntercept: number = row1 - (slope * col1);
 
         for (let col = Math.min(col1, col2); col <= Math.max(col1, col2); col++) {
-            const row = (slope * col) + yIntercept;
+            const row: number = (slope * col) + yIntercept;
             intersections.push(new Selection(Math.floor(row), Math.floor(col)));
         }
 
         for (let row = Math.min(row1, row2); row <= Math.max(row1, row2); row++) {
-            const col = (row - yIntercept) / slope;
+            const col: number = (row - yIntercept) / slope;
             intersections.push(new Selection(Math.floor(row), Math.floor(col)));
         }
     }   
@@ -186,11 +190,12 @@ export function currentTime() { return audioContext.currentTime }
     return removeDuplicates(intersections)
 }
 
-  export function getBox(firstPoint, secondPoint) {
+  export function getBox(firstPoint: Selection, secondPoint: Selection): Selection[] {
     if (firstPoint == null || secondPoint == null) return []
     const {row: row1, col: col1} = firstPoint;
     const {row: row2, col: col2} = secondPoint;
-    return [].concat(
+    const box: Selection[] = [];
+    return box.concat(
         getLine(new Selection(Math.min(row1, row2), Math.min(col1, col2)), new Selection(Math.min(row1, row2), Math.max(col1, col2))),
         getLine(new Selection(Math.min(row1, row2), Math.min(col1, col2)), new Selection(Math.max(row1, row2), Math.min(col1, col2))),
         getLine(new Selection(Math.max(row1, row2), Math.max(col1, col2)), new Selection(Math.min(row1, row2), Math.max(col1, col2))),
@@ -198,32 +203,32 @@ export function currentTime() { return audioContext.currentTime }
     )
   }
 
-  export function getFilledBox(firstPoint, secondPoint) {
-
+  export function getFilledBox(firstPoint: Selection, secondPoint: Selection): Selection[] {
+    return Area.corners([firstPoint, secondPoint]).getAllInnerCells();
   }
 
-  export function getEllipse(firstPoint, secondPoint) {
+  export function getEllipse(firstPoint: Selection, secondPoint: Selection) {
     if (firstPoint == null || secondPoint == null) return []
     const {row: row1, col: col1} = firstPoint;
     const {row: row2, col: col2} = secondPoint;
-    const centerCol = (col1 + col2) / 2
-    const centerRow = (row1 + row2 ) / 2
-    const horizontalRadius = Math.abs(col1 - col2) / 2;
-    const verticalRadius = Math.abs(row1 - row2) / 2;
-    const intersections = []
+    const centerCol: number = (col1 + col2) / 2
+    const centerRow: number = (row1 + row2 ) / 2
+    const horizontalRadius: number = Math.abs(col1 - col2) / 2;
+    const verticalRadius: number = Math.abs(row1 - row2) / 2;
+    const intersections: Selection[] = []
 
     if (firstPoint.col == secondPoint.col || firstPoint.row == secondPoint.row) {
         return getLine(firstPoint, secondPoint)
     }
    
     for (let col = Math.min(firstPoint.col, secondPoint.col); col <= Math.max(firstPoint.col, secondPoint.col); col += 1) {
-        const evaluation = Math.sqrt(Math.pow(verticalRadius, 2) * (1  - (Math.pow(col - centerCol, 2) / Math.pow(horizontalRadius, 2) ) ))
+        const evaluation: number = Math.sqrt(Math.pow(verticalRadius, 2) * (1  - (Math.pow(col - centerCol, 2) / Math.pow(horizontalRadius, 2) ) ))
         intersections.push(new Selection(Math.floor(centerRow + evaluation), Math.floor(col)));
         intersections.push(new Selection(Math.floor(centerRow - evaluation), Math.floor(col)));
     } 
 
     for (let row = Math.min(firstPoint.row, secondPoint.row); row <= Math.max(firstPoint.row, secondPoint.row); row += 1) {
-        const evaluation = Math.sqrt(Math.pow(horizontalRadius, 2) * (1  - (Math.pow(row - centerRow, 2) / Math.pow(verticalRadius, 2) ) ))
+        const evaluation: number = Math.sqrt(Math.pow(horizontalRadius, 2) * (1  - (Math.pow(row - centerRow, 2) / Math.pow(verticalRadius, 2) ) ))
         intersections.push(new Selection(Math.floor(row), Math.floor(centerCol + evaluation)));
         intersections.push(new Selection(Math.floor(row), Math.floor(centerCol - evaluation)));
     } 
@@ -232,38 +237,38 @@ export function currentTime() { return audioContext.currentTime }
 }
 
 
-export function nextLargestPerfectSquare(num) {
+export function nextLargestPerfectSquare(num: number): number {
     return (Math.pow(Math.ceil(Math.sqrt(num)) , 2))
 }
 
-export function nextSmallestPerfectSquare(num) {
+export function nextSmallestPerfectSquare(num: number): number {
     return (Math.pow(Math.floor(Math.sqrt(num)) , 2))
 }
 
-export function average(nums) {
+export function average(nums: number[]): number {
     return nums.reduce((acc, curr) => acc + curr, 0) / nums.length
 }
 
 const COLUMN_PRECISION = Math.pow(2, 16);
-export function getSortedSelections(selections) {
+export function getSortedSelections(selections: Selection[]): Selection[] {
   return selections.map(cell => Selection.clone(cell))
   .sort((cell1, cell2) => cell1.row - cell2.row + (cell1.col - cell2.col) / COLUMN_PRECISION)
 }
 
-export function isCellInSortedSelections(selection, selectionList) {
-  const testIndex = binarySearch(selectionList.map(cell => cell.row), selection.row)
+export function isCellInSortedSelections(selection: Selection, selectionList: Selection[]) {
+  const testIndex: number = binarySearch(selectionList.map(cell => cell.row), selection.row)
   if (testIndex === -1)
     return false;
 
 
-  const range = getRowRange(selectionList, testIndex)
+  const range: Selection[] = getRowRange(selectionList, testIndex)
   return binarySearch(range.map(cell => cell.col), selection.col) !== -1
 }
 
-function getRowRange(selectionList, index) {
-  const range = [];
+function getRowRange(selectionList: Selection[], index: number): Selection[] {
+  const range: Selection[] = [];
   const desiredRow = selectionList[index].row;
-  let indexIterator = -1;
+  let indexIterator: number = -1;
   while ((index + indexIterator) >= 0) {
     if (selectionList[index + indexIterator].row === desiredRow) {
       indexIterator--;
@@ -281,9 +286,9 @@ function getRowRange(selectionList, index) {
   return range;
 }
 
-export function getBoardGridStyle(numOfBoards) {
-  const numOfCols = Math.ceil(Math.sqrt(numOfBoards))
-  const numOfRows = (numOfCols - 1) + (numOfBoards > nextLargestPerfectSquare(numOfBoards) - Math.sqrt(nextLargestPerfectSquare(numOfBoards)))
+export function getBoardGridStyle(numOfBoards: number): { gridTemplateRows: string, gridTemplateColumns: string} {
+  const numOfCols: number = Math.ceil(Math.sqrt(numOfBoards))
+  const numOfRows: number = (numOfCols - 1) + Number((numOfBoards > nextLargestPerfectSquare(numOfBoards) - Math.sqrt(nextLargestPerfectSquare(numOfBoards))))
 
   return {
     gridTemplateColumns: `repeat(${numOfCols}, minmax(0, 1fr))`,
@@ -291,17 +296,19 @@ export function getBoardGridStyle(numOfBoards) {
   }
 }
 
-export function millisecondsToTimeString(milliseconds) {
-  const minutes = Math.floor(milliseconds / 1000 / 60)
-  const seconds = Math.floor(( milliseconds - ( minutes * 60 * 1000) ) / 1000)
-  const remainingMilliseconds = Math.floor(milliseconds - (seconds * 1000) - (minutes * 1000 * 60))
+export function millisecondsToTimeString(milliseconds: number): string {
+  const minutes: number = Math.floor(milliseconds / 1000 / 60)
+  const seconds: number = Math.floor(( milliseconds - ( minutes * 60 * 1000) ) / 1000)
+  const remainingMilliseconds: number = Math.floor(milliseconds - (seconds * 1000) - (minutes * 1000 * 60))
   return ` ${ minutes } minute${minutes === 1 ? "" : "s"}, ${ seconds } second${seconds === 1 ? "" : "s"}, ${ remainingMilliseconds } m${remainingMilliseconds === 1 ? "" : "s"} `
 }
 
-export function boardStatesReducer(state, action) {
+//TODO: TYPE ALL REDUCERS
+
+export function boardStatesReducer(state: any, action: any): any {
     const {type, id, request, all = false} = action;
-    const chosenBoard = state.filter(board => board.id === id)?.[0];
-    const newBoard = cloneDeep(chosenBoard);
+    const chosenBoard: any = state.filter((board: any) => board.id === id)?.[0];
+    const newBoard: any = cloneDeep(chosenBoard);
     switch (type) {
       case "remove":
         if (id == null && !all) {
@@ -310,14 +317,14 @@ export function boardStatesReducer(state, action) {
         }
 
         
-        return all ? [] : state.filter(board => board.id !== id)
+        return all ? [] : state.filter((board: any) => board.id !== id)
       case "add":
         const { boardData } = action;
         if (boardData == null) {
           console.log("cannot add null board")
           return state
         }
-        return state.concat(boardData).sort((first, second) => first.id - second.id)
+        return state.concat(boardData).sort((first: any, second: any) => first.id - second.id)
       case "alter":
         if (!chosenBoard) return state
           const {accessor = "", newValue} = request
@@ -351,7 +358,7 @@ export function boardStatesReducer(state, action) {
           //   currentProperty[finalKey] = getSortedSelections(newValue)
           // }
 
-        return state.filter(board => board.id !== id).concat(newBoard).sort((first, second) => first.id - second.id)
+        return state.filter((board: any) => board.id !== id).concat(newBoard).sort((first: any, second: any) => first.id - second.id)
         case "set state":
           if (!id) {
             console.log("no valid id");
@@ -359,14 +366,14 @@ export function boardStatesReducer(state, action) {
           }
   
           const { newState } = action;
-          return state.filter(board => board.id !== id).concat(newState).sort((first, second) => first.id - second.id );
+          return state.filter((board: any) => board.id !== id).concat(newState).sort((first: any, second: any) => first.id - second.id );
       default:
         console.log("No valid selected dispatch type: ", type)
         return state
       }
   }
 
-  export function boardReducer(state, action) {
+  export function boardReducer(state: any, action: any): any {
     const {type, request} = action;
     const newBoard = cloneDeep(state);
     switch (type) {
@@ -417,7 +424,7 @@ export function boardStatesReducer(state, action) {
       }
   }
 
-  export function patternsReducer(state, action) {
+  export function patternsReducer(state: any, action: any): any {
     const { type, id } = action;
     switch (type) {
       case "add": {
@@ -459,7 +466,7 @@ export function boardStatesReducer(state, action) {
     }
   }
 
-export function binarySearch(list, target) {
+export function binarySearch<Number>(list: Array<Number>, target: Number) {
     let left = 0;
     let right = list.length - 1
     let mid = Math.floor((right + left) / 2);

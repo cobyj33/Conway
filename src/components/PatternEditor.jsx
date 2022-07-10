@@ -1,7 +1,7 @@
 import { useContext, useMemo, useReducer, useState } from "react"
 import { PatternContext } from "../App"
-import { Selection } from "../classes/Selection.js";
-import { Pattern } from "../classes/Pattern.js";
+import { Selection } from "../classes/Selection";
+import { Pattern } from "../classes/Pattern";
 import { BoardData } from "../classes/BoardData";
 
 import { boardReducer, getPatternView } from "../functions"

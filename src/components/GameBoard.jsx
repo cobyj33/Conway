@@ -1,9 +1,9 @@
 import {useRef, useState, useEffect, useContext, useTransition} from 'react'
 
-import { Area } from "../classes/Area.js";
-import { Selection } from "../classes/Selection.js";
-import { KeyBinding } from "../classes/KeyBinding.js";
-import { Pattern } from "../classes/Pattern.js";
+import { Area } from "../classes/Area";
+import { Selection } from "../classes/Selection";
+import { KeyBinding } from "../classes/KeyBinding";
+import { Pattern } from "../classes/Pattern";
 
 
 import { FaArrowsAlt, FaEraser, FaBrush, FaRegTrashAlt, FaSearch, FaPlay, FaChevronCircleDown, FaWindowClose, FaUndo, FaCamera } from "react-icons/fa"
@@ -12,11 +12,12 @@ import { AiFillCloseCircle } from "react-icons/ai"
 import "./gameboard.css"
 import { ToolTip } from './ToolTip/ToolTip.jsx'
 import { shuffle, cloneDeep } from 'lodash'
-import { getLine, getBox, getEllipse, mirrorOverX, mirrorOverY, getNextGeneration, removeDuplicates, getAdjacentNeighbors, equalSelectionLists, rotateSelections90, millisecondsToTimeString, average, currentTime, translateSelectionsAroundPoint } from '../functions.js'
-import { AlertContext, gpu, PatternContext, RenderContext } from '../App.js'
+import { getLine, getBox, getEllipse, mirrorOverX, mirrorOverY, getNextGeneration, removeDuplicates, getAdjacentNeighbors, equalSelectionLists, rotateSelections90, millisecondsToTimeString, average, currentTime, translateSelectionsAroundPoint } from '../functions'
+import { AlertContext, gpu, PatternContext, RenderContext } from '../App'
 import { ContextMenu } from './ContextMenu.jsx'
 import { PatternEditor } from './PatternEditor.jsx'
 import { isCompositeComponent } from 'react-dom/test-utils'
+import { isConstructorDeclaration } from 'typescript';
 // import { drawCanvas } from '../functions/gpufunctions.js';
 
 //edit modes: draw, erase, pan, zoom, select
@@ -185,20 +186,23 @@ const initialRenderStatus = {
     }
 
     function clear() {
-        boardData.pushHistory();
+        // boardData.pushHistory();
+        console.error("TODO: FIX BOARD DATA PUSH HISTORY")
         lastGeneration.current = ""
         alterData('selections', [])
       }
 
+      //TODO: FIX THIS
     function undo() {
-        if (boardData.playback.enabled) {
-            console.error("cannot undo during playback");
-            return
-        }
+        console.error("TODO: FIX UNDO")
+        // if (boardData.playback.enabled) {
+        //     console.error("cannot undo during playback");
+        //     return
+        // }
 
-        const lastBoardState = boardData.popHistory();
-        if (!lastBoardState) return
-        boardDataDispatch({type: 'set state', newState: lastBoardState, id: boardData.id});
+        // const lastBoardState = boardData.popHistory();
+        // if (!lastBoardState) return
+        // boardDataDispatch({type: 'set state', newState: lastBoardState, id: boardData.id});
     }
   
 
@@ -678,7 +682,8 @@ const initialRenderStatus = {
     }
 
     function mouseDownListener(mouseEvent) {
-        boardData.pushHistory();
+        // boardData.pushHistory();
+        console.error("TODO: FIX BOARD DATA PUSH HISTORY")
         isDragging.current = true;
 
         switch (boardData.editMode) {

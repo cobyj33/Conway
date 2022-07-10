@@ -2,12 +2,10 @@ import React, { createContext, useReducer, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import './app.css'
 import { GameBoard } from './components/GameBoard'
-
 import { BoardData } from './classes/BoardData'
 import { Pattern } from './classes/Pattern'
-
 import { CreationMenu } from './components/CreationMenu'
-import { boardStatesReducer, patternsReducer, getBoardGridStyle, selectionListToString, getNextGeneration} from './functions'
+import { boardStatesReducer, patternsReducer, getBoardGridStyle, getNextGeneration} from './functions.ts'
 import icon from "./assets/Conway Logo.png"
 import { Alert } from './components/Alert'
 const patterns = require("./assets/patterns.json")
