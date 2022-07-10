@@ -1,7 +1,0 @@
-class EditMode {
-    constructor(cursorString) {
-
-    }
-
-    
-}

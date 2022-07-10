@@ -38,6 +38,9 @@ const initialRenderStatus = {
     }
     
     export const GameBoard = ( { boardData, boardDataDispatch, editable = true, closable = true, bounds = null, showToolBar = true, movable = true, drawGrid = true, initialViewArea = null, alwaysCenter = false } ) => {
+
+        const editModes = [];
+
         const currentBoardData = useRef(boardData);
         useEffect( () => {
             currentBoardData.current = cloneDeep(boardData);
@@ -404,12 +407,13 @@ const initialRenderStatus = {
         alterData("selections", currentBoardData.current.selections.map(cell => cell.isSelected ? Selection.clone({...cell, row: cell.row + rowOffset, col: cell.col + colOffset}) : Selection.clone(cell)) )
     }
 
-    function draw() {
+    async function draw() {
         const canvas = canvasRef.current
 
         // drawCanvas.setOutput([canvas.width, canvas.height]);
         // const drawnCanvas = drawCanvas()
-        console.log()
+
+
 
 
         if (!canvasRef.current) return
