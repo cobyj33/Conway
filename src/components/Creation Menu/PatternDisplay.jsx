@@ -20,7 +20,8 @@ export const PatternDisplay = ({ currentPattern }) => {
     const [gameBoards, gameBoardsDispatch] = useContext(BoardContext)
     const [boardData, boardDataDispatch] = useReducer(boardReducer, BoardData.FromSelections(currentPattern.selections.map(cell => Selection.clone(cell))));
     const [showingPatternEditor, setShowingPatternEditor] = useState(false);
-    const initialBoardView = useMemo( () => getPatternView(currentPattern), [currentPattern])
+    console.log(JSON.stringify(currentPattern));
+    const initialBoardView = useMemo( () => getPatternView(JSON.parse(JSON.stringify(currentPattern))), [currentPattern])
     
     return (
       <div className="pattern-display">

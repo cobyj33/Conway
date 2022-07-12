@@ -17,12 +17,13 @@ export const CreationMenu = ({ close }) => {
   const [showingMenuChoices, setShowingMenuChoices] = useState(false);
   
   const menu = useRef()
+
   
 
   function getDisplayAreaContent() {
     switch (currentMenu) {
       case "My Renders":
-        return renders.current.starters.length == 0 ? <span> No Saved Renders </span> : renders.current.starters.map(startingSelectionsJSON => <RenderDisplay key={startingSelectionsJSON} startingSelectionsJSON={startingSelectionsJSON}/>) 
+        return renders.current.starters.size == 0 ? <span> No Saved Renders </span> : renders.current.getStarters().map(startingSelectionsJSON => <RenderDisplay key={startingSelectionsJSON} startingSelectionsJSON={startingSelectionsJSON}/>) 
       case "My Patterns":
         return patterns.length == 0 ? <span> No Saved Patterns </span> : patterns.map(pattern => <PatternDisplay key={pattern.id} currentPattern={pattern} />)
       default: return "Error: Invalid Menu"

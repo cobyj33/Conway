@@ -18,6 +18,8 @@ import { ContextMenu } from '../Context Menu/ContextMenu'
 import { PatternEditor } from '../Pattern Editor/PatternEditor'
 import { isCompositeComponent } from 'react-dom/test-utils'
 import { isConstructorDeclaration } from 'typescript';
+import { useResizeObserver } from '../../hooks/useResizeObserver';
+import { useCanvasGPU } from '../../hooks/useCanvasGPU';
 // import { drawCanvas } from '../functions/gpufunctions.js';
 
 //edit modes: draw, erase, pan, zoom, select
@@ -39,9 +41,7 @@ const initialRenderStatus = {
     }
     
     export const GameBoard = ( { boardData, boardDataDispatch, editable = true, closable = true, bounds = null, showToolBar = true, movable = true, drawGrid = true, initialViewArea = null, alwaysCenter = false } ) => {
-
         const editModes = [];
-
         const currentBoardData = useRef(boardData);
         useEffect( () => {
             currentBoardData.current = cloneDeep(boardData);
@@ -51,13 +51,14 @@ const initialRenderStatus = {
 
         const alterData = (accessor, newValue) => { 
             const keys = accessor.split(".")
-        let currentProperty = currentBoardData.current;
-        while (keys.length > 1) {
-            currentProperty = currentProperty[keys.shift()];
-        }
+            let currentProperty = currentBoardData.current;
+            while (keys.length > 1) {
+                currentProperty = currentProperty[keys.shift()];
+            }
         currentProperty[keys.shift()] = newValue;
         boardDataDispatch({ type: 'alter', id: boardData.id, request: { accessor: accessor, newValue: newValue} })
      }
+
     const removeCallback = () => { if (closable) { boardDataDispatch({type: 'remove', id: boardData.id}) } }
     const renders = useContext(RenderContext)
     const [savedPatterns, savedPatternsDispatch ] = useContext(PatternContext) 
@@ -129,7 +130,8 @@ const initialRenderStatus = {
     const getMillisecondsPerTick = () => 1000 / boardData.settings.tickSpeed
     const getContext = () => canvasRef.current.getContext("2d")
     const getCanvasBounds = () => canvasRef?.current?.getBoundingClientRect()
-    const getCellSize = (zoom = boardData.view.zoom) => Math.min(getCanvasBounds().width, getCanvasBounds().height) * (zoom / DEFAULT_SCREEN_CELL_SPAN) //10 is the default span for the viewbox
+    //NOTE: made cell size an integer
+    const getCellSize = (zoom = boardData.view.zoom) => Math.round(Math.min(getCanvasBounds().width, getCanvasBounds().height) * (zoom / DEFAULT_SCREEN_CELL_SPAN)) //10 is the default span for the viewbox
     const getZoomFromCellSize = (cellSize) => (DEFAULT_SCREEN_CELL_SPAN * cellSize) / Math.min(getCanvasBounds().width, getCanvasBounds().height)
     const getCellsHorizontallyAcrossScreen = (zoom = boardData.view.zoom) => getCanvasBounds().width / getCellSize(zoom)
     const getCellsVerticallyAcrossScreen = (zoom = boardData.view.zoom) => getCanvasBounds().height / getCellSize(zoom)
@@ -411,15 +413,67 @@ const initialRenderStatus = {
         alterData("selections", currentBoardData.current.selections.map(cell => cell.isSelected ? Selection.clone({...cell, row: cell.row + rowOffset, col: cell.col + colOffset}) : Selection.clone(cell)) )
     }
 
+    // const canvasGPU = useCanvasGPU(canvasRef);
+
+    // const gridCanvasGenerator = useRef(gpu.createKernel(function(rowOffset, colOffset, cellSize) {
+    //     if ( (this.thread.x + colOffset) % cellSize == 0 || (this.thread.y + rowOffset) % cellSize == 0) {
+    //       this.color(0, 0, 0, 1)
+    //     } else {
+    //       this.color(0.25, 0.25, 0.25, 0);
+    //     }
+    //   }).setDynamicOutput(true).setGraphical(true).setOutput([300, 300]))
+
+    //   const selectionsCanvasGenerator = useRef(gpu.createKernel(function( cellRows, cellCols, numOfCells, cellsize, viewRow, viewCol) {
+    //     let filled = false;
+    //     for (let i = 0; i < numOfCells; i++) {
+    //       if ( cellRows[i] == Math.floor(this.thread.x / cellsize) && cellCols[i] == Math.floor(this.thread.y / cellsize) ) {
+    //         filled = true;
+    //         break;
+    //       }
+    //     }
+
+    //     if (filled) {
+    //       this.color(0, 0, 0, 0);
+    //     } else {
+    //       this.color(0.25, 0.25, 0.25, 1);
+    //     }
+    //   }).setDynamicOutput(true).setGraphical(true).setOutput([300, 300]).setDynamicArguments(true));
+
+    // function drawGridGPU() {
+        
+    //     const canvas = canvasRef.current;
+    //     const context = canvas.getContext("2d");
+    //     const viewArea = getViewArea();
+    //     const cellSize = getCellSize(); //rounded
+    //     gridCanvasGenerator.current.setOutput([canvas.width, canvas.height]);
+
+    //     const rowOffsetInPixels = Math.abs(Math.round(viewArea.row % 1 * cellSize));
+    //     const colOffsetInPixels = -Math.abs(Math.round(viewArea.col % 1 * cellSize));
+        
+    //     console.log(boardData.view);
+    //     console.log( {rowOffsetInPixels: rowOffsetInPixels, colOffsetInPixels: colOffsetInPixels, cellSize: cellSize })
+    //     gridCanvasGenerator.current(rowOffsetInPixels, colOffsetInPixels, cellSize);
+    //     context.drawImage(gridCanvasGenerator.current.canvas, 0, 0);
+    // }
+
+    // function drawSelectionsGPU(selections) {
+    //     if (selections.length == 0) { return; }
+    //     const canvas = canvasRef.current;
+    //     const context = canvas.getContext("2d");
+    //     const viewArea = getViewArea();
+    //     const cellSize = getCellSize(); //rounded
+    //     selectionsCanvasGenerator.current.setOutput([canvas.width, canvas.height]);
+
+    //     const rowOffsetInPixels = Math.abs(Math.round(viewArea.row % 1 * cellSize));
+    //     const colOffsetInPixels = -Math.abs(Math.round(viewArea.col % 1 * cellSize));
+        
+    //     console.log(boardData.view);
+    //     selectionsCanvasGenerator.current( selections.map(cell => cell.row), selections.map(cell => cell.col), selections.length, cellSize, viewArea.row, viewArea.col );
+    //     context.drawImage(selectionsCanvasGenerator.current.canvas, 0, 0);
+    // }
+
     async function draw() {
         const canvas = canvasRef.current
-
-        // drawCanvas.setOutput([canvas.width, canvas.height]);
-        // const drawnCanvas = drawCanvas()
-
-
-
-
         if (!canvasRef.current) return
         const context = getContext()
         canvas.style.backgroundColor = boardData.playback.enabled ? 'black' : ''
@@ -430,14 +484,16 @@ const initialRenderStatus = {
         context.lineWidth = getLineWidth(false);
         const viewArea = getViewArea();
         const { view } = boardData
-        const currentBox = ({row, col, width = 1, height = 1}) => [(col - view.coordinates.col) * cellSize, (row - view.coordinates.row) * cellSize, cellSize * width, cellSize * height]
+        const currentBox = ({row, col, width = 1, height = 1}) => [Math.round((col - view.coordinates.col) * cellSize), Math.round((row - view.coordinates.row) * cellSize), cellSize * width, cellSize * height]
         context.clearRect(0, 0, canvas.width, canvas.height);
         const parsedCellData = JSON.parse(displayedSelections.current)
 
-        parsedCellData.forEach(cell => context.fillRect(...currentBox(cell)) )
+        // drawSelectionsGPU(parsedCellData);
 
+        
         context.beginPath()
         if (!boardData.playback.enabled && drawGrid) {
+            // drawGridGPU();
             for (let row = Math.floor(viewArea.row - 1); row < viewArea.bottomSide + 1; row++) {
                 if (row == 0) {
                     context.stroke();
@@ -445,6 +501,7 @@ const initialRenderStatus = {
                 }
 
                 context.moveTo(0, (row - viewArea.row) * cellSize);
+                // console.log( "row: " + (row - viewArea.row) * cellSize )
                 context.lineTo(canvas.width,  (row - viewArea.row) * cellSize)
 
                 if (row == 0) {
@@ -474,6 +531,9 @@ const initialRenderStatus = {
             context.stroke();
         }   
 
+        
+        parsedCellData.forEach(cell => context.fillRect(...currentBox(cell)) )
+        
         context.setLineDash([1, 1])
         context.strokeStyle = 'lightgreen'
         context.lineWidth = 2;
@@ -518,17 +578,18 @@ const initialRenderStatus = {
     }
 
 
-    const observer = useRef(new ResizeObserver(() => {resizeCanvas(); draw()}));
-    useEffect(() => {
-        observer.current.disconnect()
-        draw()
-        observer.current = new ResizeObserver(() => { if (alwaysCenter) {
-            centerCamera({row: 0, col: 0})
-        }; resizeCanvas(); draw();  })
-        observer.current.observe(document.documentElement)
+    // const observer = useRef(new ResizeObserver(() => {resizeCanvas(); draw()}));
+    // useEffect(() => {
+    //     observer.current.disconnect()
+    //     draw()
+    //     observer.current = new ResizeObserver(() => { if (alwaysCenter) {
+    //         centerCamera({row: 0, col: 0})
+    //     }; resizeCanvas(); draw();  })
+    //     observer.current.observe(document.documentElement)
         
-        if (!canvasRef.current) return
-    })
+    //     if (!canvasRef.current) return
+    // })
+    useResizeObserver(resizeCanvas, draw);
 
     
     const frameRequested = useRef(false);
@@ -897,7 +958,7 @@ const initialRenderStatus = {
 
     useEffect( () => {
         return () => {
-            console.log("checking if render finished or not");
+            // console.log("checking if render finished or not");
             if (JSON.stringify(renderStatus) !== JSON.stringify(initialRenderStatus)) {
                 console.log("QUEUE UP RENDER");
                 const { currentGeneration, generationCount, currentGenerationCount } = renderStatus.requested;

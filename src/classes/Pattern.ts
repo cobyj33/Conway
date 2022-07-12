@@ -1,10 +1,11 @@
 import { average, getSortedSelections } from "../functions"
 import { Selection } from "./Selection"
+import { Serializable } from "../interfaces/Serializable";
 
 let patternCount = 0;
 const getPatternID = () => `Pattern #${patternCount++}`
 
-export class Pattern {
+export class Pattern implements Serializable<Pattern> {
     name: string;
     readonly id: string;
     description: string;
@@ -29,6 +30,12 @@ export class Pattern {
             // this.selections = [];
             this.selections = getSortedSelections(selections.map(cell => new Selection(cell.row - averageVerticalDistanceToCenter, cell.col - averageHorizontalDistanceToCenter, cell?.isSelected)))
         }
+    }
+
+
+    deserialize(input: Object): Pattern {
+        return new Pattern({});
+        // return new Pattern({ selections: input?.selections, })
     }
 
     get count() {

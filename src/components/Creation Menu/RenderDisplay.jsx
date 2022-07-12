@@ -1,10 +1,12 @@
 import { BoardData } from "../../classes/BoardData";
-import { useReducer, useContext, useState, useMemo, useEffect } from "react";
+import { useReducer, useContext, useState, useMemo, useEffect, FC } from "react";
 import { RenderContext, BoardContext } from "../../App";
 import { GameBoard } from "../Game Board/GameBoard";
 import { BoardSelector } from "../Board Selector/BoardSelector";
-import { getRenderView, boardReducer } from "../../functions";
+import { getPatternView, boardReducer } from "../../functions";
+import { Selection } from "../../classes/Selection";
 import "./creationmenu.css"
+
 
 
 export const RenderDisplay = ({ startingSelectionsJSON }) => {
@@ -26,11 +28,11 @@ export const RenderDisplay = ({ startingSelectionsJSON }) => {
         }})
       }
     }
-  
-  
+    
+    console.log(`starting selection JSON: ${ startingSelectionsJSON }`);
     const [generationCount, setGenerationCount] = useState(0);
     const [startingSelectionsLength, setStartingSelectionsLength] = useState(0)
-    const initialBoardDataView = useMemo(() => getRenderView(renders, startingSelectionsJSON), [startingSelectionsJSON])
+    const initialBoardDataView = useMemo(() => getPatternView( {selections: JSON.parse(startingSelectionsJSON).map(cell => new Selection(cell.row, cell.col))} ), [startingSelectionsJSON])
     useEffect( () => {
       setGenerationCount(renders.current.generationCount(startingSelectionsJSON));
       setStartingSelectionsLength(JSON.parse(startingSelectionsJSON).length)

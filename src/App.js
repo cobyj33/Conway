@@ -1,4 +1,4 @@
-import React, { createContext, useReducer, useRef, useState } from 'react'
+import React, { Context, createContext, useReducer, useRef, useState } from 'react'
 import { Sidebar } from './components/SideBar/Sidebar'
 import './app.css'
 import { GameBoard } from './components/Game Board/GameBoard'
@@ -8,6 +8,8 @@ import { CreationMenu } from './components/Creation Menu/CreationMenu'
 import { boardStatesReducer, patternsReducer, getBoardGridStyle, getNextGeneration} from './functions.ts'
 import icon from "./assets/Conway Logo.png"
 import { Alert } from './components/Alert/Alert'
+import { GPU } from 'gpu.js'
+import { Renders } from './classes/Renders'
 const patterns = require("./assets/patterns.json")
 .map(patternData => new Pattern(patternData))
 
@@ -15,11 +17,11 @@ const nextID = 0;
 
 //request: {accessor = "", newValue}
 
-export const ThemeContext = createContext();
-export const PatternContext = createContext();
-export const BoardContext = createContext();
-export const RenderContext = createContext();
-export const AlertContext = createContext();
+export const ThemeContext = createContext(null);
+export const PatternContext = createContext(null);
+export const BoardContext = createContext(null);
+export const RenderContext = createContext(null);
+export const AlertContext = createContext(null);
 
 export let currentMousePosition = { x: 0, y: 0 }
 window.addEventListener("mousemove", (mouseEvent) => {
@@ -40,6 +42,8 @@ const initialAlertState = {
   startTime: Date.now()
 }
 
+export const gpu = new GPU();
+
 export const App = () => {
     
     const [aboutMenu, setAboutMenu] = useState(false);
@@ -51,128 +55,7 @@ export const App = () => {
     const boardGrid = getBoardGridStyle(boardDatas.length)
     const [mainMenu, setMainMenu] = useState("game");
     const [alert, setAlert] = useState(initialAlertState)
-
-    const renders = useRef({
-      starters: [],
-      frames: {
-
-      },
-
-      isCycled(startingSelectionsJSON) {
-        let currentString = startingSelectionsJSON
-        const passedThrough = new Set([])
-
-        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
-          passedThrough.add(currentString)
-          currentString = this.frames[currentString]
-        }
-
-        return passedThrough.has(currentString)
-      },
-
-      generationCount(startingSelectionsJSON) {
-        let count = 0;
-        let currentString = startingSelectionsJSON
-        const passedThrough = new Set([])
-
-        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
-          passedThrough.add(currentString)
-          currentString = this.frames[currentString]
-          count++;
-        }
-
-        if (passedThrough.has(currentString))
-          return Infinity;
-        return count;
-      },
-
-      getFrames(startingSelectionsJSON) {
-        const frames = []
-        let currentString = startingSelectionsJSON
-        const passedThrough = new Set([])
-
-        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
-          passedThrough.add(currentString)
-          frames.push(currentString)
-          currentString = this.frames[currentString]
-        }
-
-        return frames;
-      },
-
-      getLastRenderedFrame(startingSelectionsJSON) {
-        let currentString = startingSelectionsJSON
-        const passedThrough = new Set([])
-        while (!passedThrough.has(currentString) && ( currentString in this.frames ) ) {
-          passedThrough.add(currentString)
-          currentString = this.frames[currentString]
-        }
-        return currentString;
-      },
-
-      addStarter(startingSelectionsJSON) {
-        if (!new Set(this.starters).has(startingSelectionsJSON)) {
-          this.starters.push(startingSelectionsJSON)
-        }
-      },
-
-      render(startingSelectionsJSON, generations = 0) {
-        console.log("generations: ", generations)
-        if (generations <= 0) {
-          console.error("[App.render()] cannot render " + generations + " generations");
-          return
-        }
-        
-        let currentString = startingSelectionsJSON
-        let currentGeneration = 0;
-        if (this.starters.some(selListString => selListString === currentString)) {
-          currentGeneration = this.generationCount(currentString);
-          currentString = this.getLastRenderedFrame(currentString)
-        } else {
-          this.starters.push(startingSelectionsJSON)
-        }
-        
-
-        while ( currentGeneration <= generations ) {
-          if (currentString in this.frames) {
-            currentString = this.frames[currentString]
-          } else {
-            this.frames[currentString] = JSON.stringify( getNextGeneration(JSON.parse(currentString)) )
-            currentString = this.frames[currentString]
-          }
-          currentGeneration++
-        }
-
-        console.log("renders object: ", this)
-      }, 
-
-      hasNextFrame(currentFrameString) {
-        return currentFrameString in this.frames;
-      },  
-
-      getNextFrame(currentFrameString) {
-        return this.frames[currentFrameString]
-      },
-
-      getRenderData(startingSelectionsJSON) {
-        return {
-          starter: startingSelectionsJSON,
-          frames: this.getFrames(startingSelectionsJSON)
-        }
-      },
-
-      loadRenderData({starter, frames}) {
-        for (let currentFrame = 0; currentFrame < frames.length - 1; currentFrame++) {
-          this.frames[frames[currentFrame]] = frames[currentFrame + 1]
-        }
-
-        if (!this.starters.some(selectionsJSON => selectionsJSON === starter)) {
-          this.starters.push(starter)
-        }
-      }
-    });
-
-    
+    const renders = useRef(new Renders());
 
     function getMenu(menu) {
 

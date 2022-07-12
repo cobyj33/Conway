@@ -3,6 +3,7 @@ import { cloneDeep } from "lodash";
 import { Selection } from "./classes/Selection"
 import { Area } from "./classes/Area"
 import { BoardData } from "./classes/BoardData";
+import { ReducerAction, ReducerState } from "react";
 
 
 const audioContext: AudioContext = new AudioContext()
@@ -66,8 +67,8 @@ export function currentTime(): number { return audioContext.currentTime }
       return [...areas].map(area => JSON.parse(area))
   }
 
-  export function getNextGeneration(selections: Selection[], selectionSet: Set<string>): Selection[] {
-    if (selectionSet == null) {
+  export function getNextGeneration(selections: Selection[], selectionSet: Set<string> = new Set<string>()): Selection[] {
+    if (selectionSet.size < selections.length) {
       selectionSet = new Set(selections.map(cell => JSON.stringify(cell)))
     }
 
@@ -97,33 +98,8 @@ export function currentTime(): number { return audioContext.currentTime }
     return secondList.every(sel => firstSet.has(JSON.stringify(sel)))
   }
 
-  //TODO: fix this?
-  export function getRenderView(rendersRef: any, startingSelectionsJSON: string): Area {
-    // const frames = rendersRef.current.getFrames(startingSelectionsJSON)
-    // if (frames.length === 0) return null
-    // const firstFrame = JSON.parse(frames[0])
-    // let [minRow, minCol, maxRow, maxCol] = [Math.min(...firstFrame.map(cell => cell.row)),
-    //   Math.min(...firstFrame.map(cell => cell.col)),
-    //   Math.max(...firstFrame.map(cell => cell.row)),
-    //   Math.max(...firstFrame.map(cell => cell.col))];
-
-    // console.log(minRow, minCol, maxRow, maxCol)
-    // frames.forEach(frame => {
-    //   const data = JSON.parse(frame)
-    //   console.log("data: ", data)
-    //   const rows = data.map(cell => cell.row)
-    //   const cols = data.map(cell => cell.col)
-    //   minRow = Math.min(minRow, Math.min(...rows))
-    //   minCol = Math.min(minCol, Math.min(...cols))
-    //   maxRow = Math.max(maxRow, Math.max(...rows))
-    //   maxCol = Math.max(maxCol, Math.max(...cols))
-    // })
-
-    // return Area.corners([{row: minRow, col: minCol}, {row: maxRow, col: maxCol}])
-    return getPatternView({ selections: JSON.parse(startingSelectionsJSON) })
-  }
-
   export function getPatternView({ selections }: { selections: Selection[] }): Area {
+    console.log("get pattern view:  " + selections);
     const initialArea: Area = Area.corners(selections);
     const { row, col, width, height }: { row: number, col: number, width: number, height: number} = initialArea;
     return new Area(row - VIEW_PADDING, col - VIEW_PADDING, width + VIEW_PADDING, height + VIEW_PADDING)
@@ -315,7 +291,6 @@ export function boardStatesReducer(state: any, action: any): any {
           console.log("cannot remove a board with no id");
           return state;
         }
-
         
         return all ? [] : state.filter((board: any) => board.id !== id)
       case "add":

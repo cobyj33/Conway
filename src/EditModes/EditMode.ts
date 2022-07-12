@@ -6,13 +6,15 @@ export abstract class EditMode {
         this.cursorString = cursorString;
         this.subModes = subModes;
     }
+}
 
-    onPointerMove() { }
-    onPointerUp() { }
-    onPointerDown() { }
-    onPointerEnter() { }
-    onPointerLeave() { }
-    onKeyDown() { }
-    onKeyUp() { }
-    onDoubleClick() { }
+interface KeyEvents {
+    onKeyDown(): void;
+    onKeyUp(): void;
+}
+
+interface PointerEvents {
+    onPointerMove(): void;
+    onPointerEnter(): void;
+    onPointerLeave(): void;
 }

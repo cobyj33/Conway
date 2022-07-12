@@ -1,9 +1,14 @@
 import { RecordWithTtl } from "dns"
 
-export class Selection {
-    readonly row: number;
+export interface ISelection {
+  readonly row: number;
     readonly col: number;
     readonly isSelected: boolean;
+}
+export class Selection implements ISelection {
+    readonly  row: number;
+    readonly  col: number;
+    readonly  isSelected: boolean;
 
     constructor(row: number, col: number, isSelected: boolean = false) {
       this.row = row
@@ -17,5 +22,9 @@ export class Selection {
 
     static clone({row, col, isSelected}: { row: number, col: number, isSelected?: boolean}): Selection {
       return new Selection(row, col, isSelected)
+    }
+
+    static fromInterface(selection: ISelection): Selection {
+      return new Selection(selection.row, selection.col, selection.isSelected);
     }
   }
