@@ -1,0 +1,135 @@
+html, body {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+/* .front-layer {
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  left: 0;
+  top: 0;
+} */
+
+html, body, body > div {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(#000, #111, #222, #333, #444, #555, #666, #777, #888, #999, #AAA);
+  margin: 0;
+}
+
+* {
+  color: white;
+  user-select: none;
+  font-family: "IM Fell Great Primer", "Times New Roman", "serif";
+  text-align: center;
+}
+
+input {
+  user-select: auto;
+}
+
+button {
+  border: none;
+  background: none;
+  color: white;
+}
+
+button:hover {
+  transition: color 0.5s;
+  color: #AAA;
+}
+
+.main-menu {
+  position: relative;
+  left: 5%;
+  width: 95%;
+  height: 100%;
+}
+
+.game-area {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  /* justify-content: stretch;
+  align-content: stretch; */
+
+  /* display: flex;
+  flex-direction: row;
+  flex-wrap: wrap; */
+  /* flex-wrap: wrap; */
+}
+
+.empty-game-area {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.sidebar button {
+  border: none;
+  background: none;
+  border-radius: 10px;
+}
+
+.on {
+  background-color: lightgreen;
+  color: green;
+}
+
+button.opened {
+  color: lightblue;
+}
+
+button.opened::before {
+  content: ">>"
+}
+
+
+.sidebar > *:hover {
+  animation: lightShake 200ms 1;
+}
+
+@keyframes lightShake {
+  25% { transform: rotateZ(5deg); }
+  50 % { transform: rotateZ(-5deg); }
+  75% { transform: rotateZ(5deg); } 
+}
+
+.about {
+  font-size: 12px;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+
+.notice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}

@@ -1,0 +1,41 @@
+.pattern-editor {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+
+    position: absolute;
+    background-color: #222;
+    padding: 10px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 75%;
+    aspect-ratio: 16 / 9;
+    /* z-index: 100; */
+    max-width: 75vw;
+    max-height: 75vh;
+}
+
+.pattern-editor * {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0px;
+}
+
+.pattern-editor .board-container {
+    flex-grow: 2;
+    position: relative;
+}
+
+.pattern-editor .board-container .game-board {
+    position: absolute;
+}
+
+.input-area {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: stretch;
+    align-items: center;
+}

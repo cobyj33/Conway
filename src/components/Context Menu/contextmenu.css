@@ -1,0 +1,35 @@
+.context-menu {
+    position: fixed;
+    display: flex;
+    z-index: 999;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    padding: 5px;
+    border-radius: 2px;
+    box-shadow: 0 0 2px black;
+  
+    min-width: 200px;
+    background: radial-gradient(rgba(50, 50, 50, 0.5), rgba(40, 40, 40, 80), rgba(30, 30, 30, 60), rgba(20, 20, 20, 40), rgba(10, 10, 10, 20));
+  }
+  
+.context-menu button {
+  width: 80%;
+  background-color: #333;
+  border: none;
+  color: #AAA;
+  text-align: center;
+}
+
+.context-menu button:hover {
+  transition: width 0.5s, background-color 0.2s, font-weight 0.2s, border-top 0.2s, border-bottom 0.2s;
+  background-color: #222;
+  width: 85%;
+  font-weight: bold;
+  border-radius: 2px;
+  border-bottom: 2px solid black;
+  border-top: 2px solid black;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+}

@@ -1,0 +1,120 @@
+.top-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    width: 100%;
+    height: 10%;
+    max-height: 50px;
+    background-color: rgb(50, 50, 50);
+}
+
+.creation-menu {
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    background-color: rgb(50, 50, 50);
+    background-image: url("../../assets/Matters In My Own Hands.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+    border-bottom: 2px solid black;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    color: white;
+}
+
+.creation-menu-top-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.creation-menu-selections, .creation-menu-top-bar-options {
+    display: flex;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+.display-area {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow-y: scroll;
+    width: 75%;
+}
+
+.pattern-display, .render-display {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    padding: 20px;
+    max-width: 100vw;
+    max-height: 100vh; 
+    background-color: black;
+}
+
+.pattern-display .board-container, .render-display .board-container {
+    position: relative;
+    flex-grow: 2;
+    flex-shrink: 2;
+    flex-basis: 0px;
+    background-color: red;
+    background-color: #222;
+    padding: 5px;
+}
+
+.pattern-display .board-container .game-board, .render-display .board-container .game-board {
+    position: absolute;
+}
+
+.pattern-display-information, .render-display-information {
+    flex-grow: 2;
+    flex-shrink: 1;
+    flex-basis: 0px;
+
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #222;
+    padding: 10px;
+}
+
+.pattern-display-information > div, .render-display-information > div {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.menu-choices {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    background-color: black;
+}
+
+.menu-choices button {
+    border-bottom: rgb(50, 50, 50);
+}
+
+.pattern-delete-button:hover {
+    transition: color 0.2s;
+    color: red;
+}
+
+.creation-menu button.selected {
+    transition: color 0.1s;
+    color: green;
+}

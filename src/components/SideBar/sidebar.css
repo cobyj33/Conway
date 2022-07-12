@@ -1,0 +1,48 @@
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 5%;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: linear-gradient(to right, #444, #888);
+    border-radius: 10px;
+    border: 2px solid black;
+}
+
+.sidebar div {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.sidebar * {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    text-align: center;
+}
+
+.sidebar:hover {
+    transition: width 0.5s, opacity 0.5s;
+    width: 20%;
+}
+
+.sidebar:hover * {
+    transition: opacity 0.5s, width 0.5s, height 0.5s;
+    width: auto;
+    height: auto;
+    opacity: 100%;
+}
+
+input {
+    background-color: black;
+    font-family: 'Times New Roman', Times, serif;
+    border-radius: 5px;
+    border: 1px solid white;
+    caret-color: lightcyan;
+}
